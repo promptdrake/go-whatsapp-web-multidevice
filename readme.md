@@ -433,35 +433,58 @@ This project includes a `.air.toml` configuration in the `src/` directory for fa
    ```
 4. Air will automatically watch code changes, rebuild, and reload the server on `http://localhost:3000`.
 
-### Docker (Quick Start)
+### Docker Deployment & Builds
 
-Docker avoids the need to install Go, FFmpeg, and libwebp directly on the host.
+Docker avoids the need to install Go, FFmpeg, and libwebp directly on the host system.
 
-#### Using Docker Compose (Recommended)
+#### 1. Running Pre-built Images from GitHub Container Registry (GHCR)
 
-1. Clone the repository: `git clone https://github.com/promptdrake/go-whatsapp-web-multidevice`.
-2. Open the cloned directory in a terminal.
-3. (Optional) Copy and configure environment variables:
+You can run the official pre-built image directly without compiling:
+
+```bash
+docker run -d \
+  --name whatsapp \
+  -p 3000:3000 \
+  --restart always \
+  -v $(pwd)/storages:/app/storages \
+  -v $(pwd)/statics:/app/statics \
+  -e GOWA_EMAIL="admin@example.com" \
+  -e GOWA_PASSWORD="admin" \
+  ghcr.io/promptdrake/go-whatsapp-web-multidevice:latest
+```
+
+---
+
+#### 2. Building & Running with Docker Compose (Local Build)
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/promptdrake/go-whatsapp-web-multidevice
+   cd go-whatsapp-web-multidevice
+   ```
+2. (Optional) Copy and configure environment variables:
    ```bash
    cp src/.env.example src/.env
    ```
-4. Build and start the container:
+3. Build and start the container in background:
    ```bash
    docker compose up -d --build
    ```
-5. View logs:
+4. View live logs:
    ```bash
    docker compose logs -f
    ```
-6. Open `http://localhost:3000`.
+5. Access the SaaS dashboard at `http://localhost:3000`.
 
-#### Using Docker CLI (Manual Build & Run)
+---
 
-1. Build the Docker image from the repository root:
+#### 3. Building & Running with Docker CLI (Manual Build)
+
+1. Build the Docker image from repository root:
    ```bash
-   docker build -t go-whatsapp .
+   docker build -t promptdrake/go-whatsapp-web-multidevice:latest .
    ```
-2. Run the container with volume mounts for persistent sessions and statics:
+2. Run the container with persistent volumes for database sessions and media files:
    ```bash
    docker run -d \
      --name whatsapp \
@@ -469,9 +492,49 @@ Docker avoids the need to install Go, FFmpeg, and libwebp directly on the host.
      --restart always \
      -v $(pwd)/storages:/app/storages \
      -v $(pwd)/statics:/app/statics \
-     go-whatsapp
+     -e GOWA_EMAIL="admin@example.com" \
+     -e GOWA_PASSWORD="admin" \
+     promptdrake/go-whatsapp-web-multidevice:latest
    ```
-3. Open `http://localhost:3000`.
+
+---
+
+#### 4. Multi-Architecture Local Builds (`linux/amd64` + `linux/arm64`)
+
+Using Docker Buildx, you can build images compatible with both x86/amd64 servers and ARM/Apple Silicon/Raspberry Pi:
+
+```bash
+# Create buildx builder instance (one-time)
+docker buildx create --name gowabuilder --use
+docker buildx inspect --bootstrap
+
+# Build and export multi-platform image
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t promptdrake/go-whatsapp-web-multidevice:latest \
+  --load .
+```
+
+---
+
+#### 5. Automated Multi-Arch Image Publishing (GitHub Actions CI/CD)
+
+This repository includes an automated multi-arch GitHub Actions pipeline at [`.github/workflows/build-docker-image.yaml`](.github/workflows/build-docker-image.yaml).
+
+**How it works:**
+1. **Trigger via Version Tag**: Whenever you tag and push a release version (e.g. `v9.4.0`):
+   ```bash
+   git tag v9.4.0
+   git push origin v9.4.0
+   ```
+2. **Automated Matrix Compilation**:
+   - Compiles `linux/amd64`
+   - Compiles `linux/arm64` (ARM64 / Apple Silicon / Graviton)
+   - Compiles `linux/arm/v7` (Raspberry Pi 32-bit)
+3. **Automated Publishing to GHCR**:
+   - Pushes multi-arch images directly to `ghcr.io/promptdrake/go-whatsapp-web-multidevice:v9.4.0` and `ghcr.io/promptdrake/go-whatsapp-web-multidevice:latest`.
+4. **(Optional) Automated Publishing to Docker Hub**:
+   - To also push to Docker Hub, add `REGISTRY_USERNAME` and `REGISTRY_PASSWORD` under **GitHub Repo → Settings → Secrets and variables → Actions**.
+
 
 ### Build your own binary
 
