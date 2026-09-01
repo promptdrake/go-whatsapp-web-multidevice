@@ -16,7 +16,7 @@ Your support helps ensure the project stays maintained and receives regular upda
 
 ---
 
-![release version](https://img.shields.io/github/v/release/promptdrake/go-whatsapp-web-multidevice)
+![tag version](https://img.shields.io/github/v/tag/promptdrake/go-whatsapp-web-multidevice)
 ![Build Image](https://github.com/promptdrake/go-whatsapp-web-multidevice/actions/workflows/build-docker-image.yaml/badge.svg)
 ![Binary Release](https://github.com/promptdrake/go-whatsapp-web-multidevice/actions/workflows/release.yml/badge.svg)
 

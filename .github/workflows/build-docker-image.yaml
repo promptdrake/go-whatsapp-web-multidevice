@@ -9,139 +9,53 @@ on:
       - "*"
 
 jobs:
-  build-and-push-amd:
+  build-and-push-multiarch:
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
-      - name: Login Docker Hub (Optional)
-        if: ${{ secrets.REGISTRY_USERNAME != '' && secrets.REGISTRY_PASSWORD != '' }}
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.REGISTRY_USERNAME }}
-          password: ${{ secrets.REGISTRY_PASSWORD }}
-      - name: Login GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Determine Tags
-        id: tags
-        run: |
-          TAGS="ghcr.io/${{ github.repository_owner }}/go-whatsapp-web-multidevice:${{ github.ref_name }}-amd"
-          if [ -n "${{ secrets.REGISTRY_USERNAME }}" ]; then
-            TAGS="${TAGS},${{ secrets.REGISTRY_USERNAME }}/go-whatsapp-web-multidevice:${{ github.ref_name }}-amd"
-          fi
-          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          push: true
-          context: .
-          file: ./docker/golang.Dockerfile
-          platforms: linux/amd64
-          tags: ${{ steps.tags.outputs.tags }}
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-  build-and-push-arm:
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    name: Build and Push ARM (${{ matrix.suffix }})
-    runs-on: ubuntu-24.04-arm
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - suffix: arm
-            platform: linux/arm64
-            qemu_platforms: ""
-          - suffix: armv7
-            platform: linux/arm/v7
-            qemu_platforms: arm
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-      - name: Login Docker Hub (Optional)
-        if: ${{ secrets.REGISTRY_USERNAME != '' && secrets.REGISTRY_PASSWORD != '' }}
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.REGISTRY_USERNAME }}
-          password: ${{ secrets.REGISTRY_PASSWORD }}
-      - name: Login GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Set up QEMU
-        if: matrix.qemu_platforms != ''
+      - name: Set up QEMU for Multi-Arch
         uses: docker/setup-qemu-action@v3
-        with:
-          platforms: ${{ matrix.qemu_platforms }}
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Determine Tags
-        id: tags
-        run: |
-          TAGS="ghcr.io/${{ github.repository_owner }}/go-whatsapp-web-multidevice:${{ github.ref_name }}-${{ matrix.suffix }}"
-          if [ -n "${{ secrets.REGISTRY_USERNAME }}" ]; then
-            TAGS="${TAGS},${{ secrets.REGISTRY_USERNAME }}/go-whatsapp-web-multidevice:${{ github.ref_name }}-${{ matrix.suffix }}"
-          fi
-          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          push: true
-          context: .
-          file: ./docker/golang.Dockerfile
-          platforms: ${{ matrix.platform }}
-          tags: ${{ steps.tags.outputs.tags }}
 
-  merge-manifest:
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    needs: [build-and-push-amd, build-and-push-arm]
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Login Docker Hub (Optional)
-        if: ${{ secrets.REGISTRY_USERNAME != '' && secrets.REGISTRY_PASSWORD != '' }}
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.REGISTRY_USERNAME }}
-          password: ${{ secrets.REGISTRY_PASSWORD }}
       - name: Login GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Create Versioned Manifest (GHCR) (${{ github.ref_name }})
-        run: |
-          docker buildx imagetools create -t ghcr.io/${{ github.repository_owner }}/go-whatsapp-web-multidevice:${{ github.ref_name }} \
-            ghcr.io/${{ github.repository_owner }}/go-whatsapp-web-multidevice:${{ github.ref_name }}-amd \
-            ghcr.io/${{ github.repository_owner }}/go-whatsapp-web-multidevice:${{ github.ref_name }}-arm \
-            ghcr.io/${{ github.repository_owner }}/go-whatsapp-web-multidevice:${{ github.ref_name }}-armv7
-      - name: Create Latest Manifest (GHCR)
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          docker buildx imagetools create -t ghcr.io/${{ github.repository_owner }}/go-whatsapp-web-multidevice:latest \
-            ghcr.io/${{ github.repository_owner }}/go-whatsapp-web-multidevice:${{ github.ref_name }}
-      - name: Create Manifest (Docker Hub)
+
+      - name: Login Docker Hub (Optional)
         if: ${{ secrets.REGISTRY_USERNAME != '' && secrets.REGISTRY_PASSWORD != '' }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Determine Tags
+        id: meta
         run: |
-          docker buildx imagetools create -t ${{ secrets.REGISTRY_USERNAME }}/go-whatsapp-web-multidevice:${{ github.ref_name }} \
-            ${{ secrets.REGISTRY_USERNAME }}/go-whatsapp-web-multidevice:${{ github.ref_name }}-amd \
-            ${{ secrets.REGISTRY_USERNAME }}/go-whatsapp-web-multidevice:${{ github.ref_name }}-arm \
-            ${{ secrets.REGISTRY_USERNAME }}/go-whatsapp-web-multidevice:${{ github.ref_name }}-armv7
-          docker buildx imagetools create -t ${{ secrets.REGISTRY_USERNAME }}/go-whatsapp-web-multidevice:latest \
-            ${{ secrets.REGISTRY_USERNAME }}/go-whatsapp-web-multidevice:${{ github.ref_name }}
+          REPO_OWNER="${{ github.repository_owner }}"
+          REF_NAME="${{ github.ref_name }}"
+          TAGS="ghcr.io/${REPO_OWNER}/go-whatsapp-web-multidevice:${REF_NAME},ghcr.io/${REPO_OWNER}/go-whatsapp-web-multidevice:latest"
+          
+          if [ -n "${{ secrets.REGISTRY_USERNAME }}" ]; then
+            TAGS="${TAGS},${{ secrets.REGISTRY_USERNAME }}/go-whatsapp-web-multidevice:${REF_NAME},${{ secrets.REGISTRY_USERNAME }}/go-whatsapp-web-multidevice:latest"
+          fi
+          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
+
+      - name: Build and Push Multi-Arch Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/golang.Dockerfile
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}

@@ -13,12 +13,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@v5
         with:
-          go-version: "1.26.0"
+          go-version: "stable"
 
       - name: Install cross-compilation toolchains
         run: |
@@ -32,7 +32,7 @@ jobs:
             gcc-i686-linux-gnu
 
       - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v7
+        uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"
           install-only: true
@@ -143,7 +143,7 @@ jobs:
           release:
             draft: false
             github:
-              owner: "aldinokemal"
+              owner: "${{ github.repository_owner }}"
               name: "go-whatsapp-web-multidevice"
           EOF
 
@@ -158,15 +158,15 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@v5
         with:
-          go-version: "1.26.0"
+          go-version: "stable"
 
       - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@v7
+        uses: goreleaser/goreleaser-action@v6
         with:
           version: "~> v2"
           install-only: true
@@ -217,7 +217,7 @@ jobs:
           release:
             draft: false
             github:
-              owner: "aldinokemal"
+              owner: "${{ github.repository_owner }}"
               name: "go-whatsapp-web-multidevice"
           EOF
 
