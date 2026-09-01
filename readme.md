@@ -16,22 +16,96 @@ Your support helps ensure the project stays maintained and receives regular upda
 
 ---
 
-![release version](https://img.shields.io/github/v/release/aldinokemal/go-whatsapp-web-multidevice)
-![Build Image](https://github.com/aldinokemal/go-whatsapp-web-multidevice/actions/workflows/build-docker-image.yaml/badge.svg)
-![Binary Release](https://github.com/aldinokemal/go-whatsapp-web-multidevice/actions/workflows/release.yml/badge.svg)
+![release version](https://img.shields.io/github/v/release/promptdrake/go-whatsapp-web-multidevice)
+![Build Image](https://github.com/promptdrake/go-whatsapp-web-multidevice/actions/workflows/build-docker-image.yaml/badge.svg)
+![Binary Release](https://github.com/promptdrake/go-whatsapp-web-multidevice/actions/workflows/release.yml/badge.svg)
+
+## Multi-Device WhatsApp SaaS Platform (PromptDrake Fork)
+
+This repository is an enhanced, multi-tenant **SaaS Edition** of [aldinokemal/go-whatsapp-web-multidevice](https://github.com/aldinokemal/go-whatsapp-web-multidevice), extending the core engine into a full-featured WhatsApp-as-a-Service system with tenant registration, role-based access control, subscription tiers, daily/monthly quota limiters, self-service developer API keys, webhooks, and an interactive web dashboard.
+
+### 📸 Dashboard & Interface Previews
+
+<div align="center">
+  <img src="gallery/preview-overview.png" alt="SaaS Dashboard Overview" width="90%">
+  <p><em>Overview Dashboard — Real-time WhatsApp Device instances, Quotas, and Usage Summary</em></p>
+</div>
+
+<div align="center">
+  <img src="gallery/preview-plans.png" alt="Subscription Plans & Quotas" width="90%">
+  <p><em>Subscription Plans & Quota Management — Trial, Ocean, and Sea Tiers</em></p>
+</div>
+
+<div align="center">
+  <img src="gallery/preview-login.png" alt="Tenant Login Screen" width="60%">
+  <p><em>Tenant Authentication — Sleek Dark/Light Mode Login & Registration</em></p>
+</div>
+
+---
+
+### 🚀 Comparison: Upstream (Aldinokemal) vs SaaS Edition (PromptDrake Fork)
+
+| Feature | Upstream (`aldinokemal`) | PromptDrake SaaS Edition (This Fork) |
+|---|---|---|
+| **Architecture** | Single-tenant developer gateway | **Multi-tenant SaaS Platform** |
+| **Authentication** | Static Basic Auth header | **JWT Tenant Authentication + Role Access (Admin / Pelanggan)** |
+| **Subscription Tiers** | None | **Tiered Plans (Trial, Ocean, Sea) with Custom Quotas** |
+| **Quota Enforcement** | None | **Device Slot Caps, Direct Send Limits (Daily Reset), Broadcast Quotas (Monthly Reset)** |
+| **Developer API Access** | Global HTTP Auth | **Tenant API Keys (`X-API-Key`) with Tier Limitations** |
+| **Webhooks** | Global / Single device config | **Tenant Webhook Subscriptions with Secret Signatures** |
+| **Swagger API Docs** | Static OpenAPI | **Dual Interactive Swagger (`/swagger/user` & `/swagger/admin`)** |
+| **Web Dashboard** | External static HTML asset | **Full-Featured Embedded UI (Vue 3, Tailwind, Dark/Light Mode, Chats, Auto-Responder, Quotas)** |
+| **First-Run Provisioning** | Manual setup | **Auto-creates Admin from `.env` (`GOWA_EMAIL` / `GOWA_PASSWORD`) & seeds Default Plans** |
+
+---
+
+### 💳 Default Subscription Tiers (Auto-Seeded on First Run)
+
+The platform automatically configures 3 default subscription tiers on initial startup:
+
+1. **Trial (`trial`)**
+   - **Price**: Rp 0 / 7 days
+   - **Device Cap**: 1 device
+   - **Direct Send Limit**: 100 msgs/day *(resets daily at 00:00 UTC)*
+   - **Broadcast Quota**: 3 campaigns/month *(resets 1st of every month)*
+   - **API Keys**: 1 key
+   - **Webhooks**: 1 webhook
+   - **Description**: *No description set for this tier.*
+
+2. **Ocean (`ocean`)**
+   - **Price**: Rp 35.000 / 30 days
+   - **Device Cap**: 2 devices
+   - **Direct Send Limit**: 100 msgs/day *(resets daily at 00:00 UTC)*
+   - **Broadcast Quota**: 5,000 campaigns/month *(resets 1st of every month)*
+   - **API Keys**: 1 key
+   - **Webhooks**: 1 webhook
+   - **Description**: *Ideal for individuals starting WhatsApp automation (100 messages sending limit & 5,000 broadcasts).*
+
+3. **Sea (`sea`)**
+   - **Price**: Rp 75.000 / 30 days
+   - **Device Cap**: 10 devices
+   - **Direct Send Limit**: **Unlimited**
+   - **Broadcast Quota**: **Unlimited**
+   - **API Keys**: 2 keys
+   - **Webhooks**: 4 webhooks
+   - **Description**: *Designed for growing businesses with unlimited sending messages, unlimited broadcasts & multi-device power.*
+
+---
 
 ## ARM, AMD64, and MCP Support
 
 Download:
 
-- [Release](https://github.com/aldinokemal/go-whatsapp-web-multidevice/releases/latest)
+- [Release](https://github.com/promptdrake/go-whatsapp-web-multidevice/releases/latest)
+- [GitHub Container Registry](https://github.com/promptdrake/go-whatsapp-web-multidevice/pkgs/container/go-whatsapp-web-multidevice)
 - [Docker Hub](https://hub.docker.com/r/aldinokemal2104/go-whatsapp-web-multidevice/tags)
-- [GitHub Container Registry](https://github.com/aldinokemal/go-whatsapp-web-multidevice/pkgs/container/go-whatsapp-web-multidevice)
+
 
 ## n8n Community Node
 
 - [n8n package](https://www.npmjs.com/package/@aldinokemal2104/n8n-nodes-gowa)
 - Go to **Settings → Community Nodes**, enter `@aldinokemal2104/n8n-nodes-gowa`, and select **Install**.
+
 
 ## Breaking Changes
 
@@ -231,6 +305,8 @@ To use environment variables:
 | `APP_DEBUG`                             | Enable debug logging                                          | `false`                                      | `APP_DEBUG=true`                              |
 | `APP_OS`                                | OS name (device name in WhatsApp)                             | `GOWA`                                       | `APP_OS=MyApp`                                |
 | `APP_BASIC_AUTH`                        | Basic authentication credentials                              | -                                            | `APP_BASIC_AUTH=user1:pass1,user2:pass2`      |
+| `GOWA_EMAIL`                            | Initial Admin user email for SaaS dashboard                   | `admin@example.com`                          | `GOWA_EMAIL=admin@mycompany.com`              |
+| `GOWA_PASSWORD`                         | Initial Admin user password for SaaS dashboard                | `admin`                                      | `GOWA_PASSWORD=StrongAdminPassword123`        |
 | `APP_BASE_PATH`                         | Base path for subpath deployment                              | -                                            | `APP_BASE_PATH=/gowa`                         |
 | `APP_TRUSTED_PROXIES`                   | Trusted proxy IP ranges for reverse proxy                     | -                                            | `APP_TRUSTED_PROXIES=0.0.0.0/0`               |
 | `APP_CORS_ALLOWED_ORIGINS`              | Allowed CORS origins (any origin when empty)                  | -                                            | `APP_CORS_ALLOWED_ORIGINS=https://ui.example.com` |
@@ -331,27 +407,75 @@ Run `./whatsapp --help` to see all command-line flags.
 
 ## How to use
 
-### Basic
+### Local Development (Standard)
 
-1. Clone the repository: `git clone https://github.com/aldinokemal/go-whatsapp-web-multidevice`.
+1. Clone the repository: `git clone https://github.com/promptdrake/go-whatsapp-web-multidevice`.
 2. Open the cloned directory in a terminal.
-3. Run `cd src`.
-4. Run `go run . rest`.
+3. Switch to the Go module root: `cd src`.
+4. Run the server: `go run . rest`.
 5. Open `http://localhost:3000`.
 
-### Docker
+### Local Development with Live Reload (Air)
+
+This project includes a `.air.toml` configuration in the `src/` directory for fast hot-reloading during development:
+
+1. Install [Air](https://github.com/air-verse/air):
+   ```bash
+   go install github.com/air-verse/air@latest
+   ```
+2. Navigate to the `src/` directory (the Go module root):
+   ```bash
+   cd src
+   ```
+3. Start Air:
+   ```bash
+   air
+   ```
+4. Air will automatically watch code changes, rebuild, and reload the server on `http://localhost:3000`.
+
+### Docker (Quick Start)
 
 Docker avoids the need to install Go, FFmpeg, and libwebp directly on the host.
 
-1. Clone the repository: `git clone https://github.com/aldinokemal/go-whatsapp-web-multidevice`.
+#### Using Docker Compose (Recommended)
+
+1. Clone the repository: `git clone https://github.com/promptdrake/go-whatsapp-web-multidevice`.
 2. Open the cloned directory in a terminal.
-3. Copy the environment file: `cp src/.env.example src/.env`.
-4. Run `docker compose up -d --build`.
-5. Open `http://localhost:3000`.
+3. (Optional) Copy and configure environment variables:
+   ```bash
+   cp src/.env.example src/.env
+   ```
+4. Build and start the container:
+   ```bash
+   docker compose up -d --build
+   ```
+5. View logs:
+   ```bash
+   docker compose logs -f
+   ```
+6. Open `http://localhost:3000`.
+
+#### Using Docker CLI (Manual Build & Run)
+
+1. Build the Docker image from the repository root:
+   ```bash
+   docker build -t go-whatsapp .
+   ```
+2. Run the container with volume mounts for persistent sessions and statics:
+   ```bash
+   docker run -d \
+     --name whatsapp \
+     -p 3000:3000 \
+     --restart always \
+     -v $(pwd)/storages:/app/storages \
+     -v $(pwd)/statics:/app/statics \
+     go-whatsapp
+   ```
+3. Open `http://localhost:3000`.
 
 ### Build your own binary
 
-1. Clone the repository: `git clone https://github.com/aldinokemal/go-whatsapp-web-multidevice`.
+1. Clone the repository: `git clone https://github.com/promptdrake/go-whatsapp-web-multidevice`.
 2. Open the cloned directory in a terminal.
 3. Run `cd src`.
 4. Build the binary:
@@ -369,7 +493,7 @@ Run `./whatsapp --help` (or `.\whatsapp.exe --help` on Windows) to see all flags
 To build for a Raspberry Pi or another ARM device without a C toolchain (CGO), use the `purego` build tag. This
 selects a pure-Go SQLite implementation.
 
-1. Clone the repository: `git clone https://github.com/aldinokemal/go-whatsapp-web-multidevice`.
+1. Clone the repository: `git clone https://github.com/promptdrake/go-whatsapp-web-multidevice`.
 2. Open the cloned directory in a terminal.
 3. Run `cd src`.
 4. **Build for Raspberry Pi Zero / 1 (ARMv6):**

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	domainAuth "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/auth"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
@@ -119,6 +120,47 @@ type IChatStorageRepository interface {
 	SetDeviceWebhookConfig(deviceID string, config *DeviceWebhookConfig) error
 	// GetDeviceWebhookConfig retrieves the full webhook configuration for a device.
 	GetDeviceWebhookConfig(deviceID string) (*DeviceWebhookConfig, error)
+
+	// SaaS User, Plan, API Key & Webhook operations
+	CreateUser(user *domainAuth.User) error
+	GetUserByEmail(email string) (*domainAuth.User, error)
+	GetUserByID(id int64) (*domainAuth.User, error)
+	UpdateUser(user *domainAuth.User) error
+	UpdateUserTier(userID int64, tierID domainAuth.PlanID, tierName string, expiresAt *time.Time) error
+	IncrementMessageCount(userID int64, count int) error
+	IncrementBroadcastCount(userID int64, count int) error
+	ResetDailyMessageQuotas(ctx context.Context, period string) (int64, error)
+	ResetMonthlyBroadcastQuotas(ctx context.Context, period string) (int64, error)
+	ResetMonthlyQuotas(ctx context.Context, period string) (int64, error)
+	IsPeriodQuotaReset(ctx context.Context, period string) (bool, error)
+	ManualResetAllQuotas(ctx context.Context) (int64, error)
+	ListUsers() ([]*domainAuth.User, error)
+	DeleteUser(userID int64) error
+	CountDevicesByUserID(userID int64) (int, error)
+	ListDeviceRecordsByUserID(userID int64) ([]*DeviceRecord, error)
+
+	CreateApiKey(apiKey *domainAuth.ApiKey) error
+	GetApiKeysByUserID(userID int64) ([]*domainAuth.ApiKey, error)
+	GetApiKeyByValue(keyValue string) (*domainAuth.ApiKey, error)
+	DeleteApiKey(id, userID int64) error
+
+	CreateUserWebhook(webhook *domainAuth.UserWebhook) error
+	GetUserWebhooksByUserID(userID int64) ([]*domainAuth.UserWebhook, error)
+	DeleteUserWebhook(id, userID int64) error
+
+	// Plan operations
+	GetAllPlans() ([]domainAuth.Plan, error)
+	GetPlanByID(id domainAuth.PlanID) (*domainAuth.Plan, error)
+	CreatePlan(plan *domainAuth.Plan) error
+	UpdatePlan(plan *domainAuth.Plan) error
+	DeletePlan(id domainAuth.PlanID) error
+
+	// Auto Response operations
+	GetActiveAutoResponses(ctx context.Context, deviceID string) ([]domainAuth.AutoResponse, error)
+	GetUserAutoResponses(ctx context.Context, userID int64) ([]domainAuth.AutoResponse, error)
+	CreateAutoResponse(ctx context.Context, ar *domainAuth.AutoResponse) error
+	UpdateAutoResponse(ctx context.Context, ar *domainAuth.AutoResponse) error
+	DeleteAutoResponse(ctx context.Context, id int64, userID int64) error
 
 	// Schema operations
 	InitializeSchema() error

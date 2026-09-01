@@ -10,7 +10,7 @@ import (
 )
 
 // handleNewsletterJoin handles when you join/subscribe to a newsletter
-func handleNewsletterJoin(ctx context.Context, evt *events.NewsletterJoin, deviceID string, client *whatsmeow.Client) {
+func handleNewsletterJoin(ctx context.Context, evt *events.NewsletterJoin, deviceID string, _ *whatsmeow.Client) {
 	log.Infof("Joined newsletter %s", evt.ID)
 
 	go func(e *events.NewsletterJoin) {
@@ -23,7 +23,7 @@ func handleNewsletterJoin(ctx context.Context, evt *events.NewsletterJoin, devic
 }
 
 // handleNewsletterLeave handles when you leave/unsubscribe from a newsletter
-func handleNewsletterLeave(ctx context.Context, evt *events.NewsletterLeave, deviceID string, client *whatsmeow.Client) {
+func handleNewsletterLeave(ctx context.Context, evt *events.NewsletterLeave, deviceID string, _ *whatsmeow.Client) {
 	log.Infof("Left newsletter %s (role: %s)", evt.ID, evt.Role)
 
 	go func(e *events.NewsletterLeave) {
@@ -36,7 +36,7 @@ func handleNewsletterLeave(ctx context.Context, evt *events.NewsletterLeave, dev
 }
 
 // handleNewsletterLiveUpdate handles new messages in newsletters
-func handleNewsletterLiveUpdate(ctx context.Context, evt *events.NewsletterLiveUpdate, deviceID string, client *whatsmeow.Client) {
+func handleNewsletterLiveUpdate(ctx context.Context, evt *events.NewsletterLiveUpdate, deviceID string, _ *whatsmeow.Client) {
 	log.Infof("Newsletter %s: %d new message(s)", evt.JID, len(evt.Messages))
 
 	go func(e *events.NewsletterLiveUpdate) {
@@ -49,7 +49,7 @@ func handleNewsletterLiveUpdate(ctx context.Context, evt *events.NewsletterLiveU
 }
 
 // handleNewsletterMuteChange handles newsletter mute setting changes
-func handleNewsletterMuteChange(ctx context.Context, evt *events.NewsletterMuteChange, deviceID string, client *whatsmeow.Client) {
+func handleNewsletterMuteChange(ctx context.Context, evt *events.NewsletterMuteChange, deviceID string, _ *whatsmeow.Client) {
 	log.Infof("Newsletter %s mute changed to: %s", evt.ID, evt.Mute)
 
 	go func(e *events.NewsletterMuteChange) {

@@ -4,18 +4,26 @@ import (
 	"fmt"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
+	domainAuth "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/auth"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/chatstorage"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/domains/device"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest/middleware"
 	"github.com/gofiber/fiber/v3"
 )
 
 type Device struct {
-	Service device.IDeviceUsecase
+	Service         device.IDeviceUsecase
+	AuthService     domainAuth.IAuthUsecase
+	ChatStorageRepo chatstorage.IChatStorageRepository
 }
 
-func InitRestDevice(app fiber.Router, service device.IDeviceUsecase) Device {
-	rest := Device{Service: service}
+func InitRestDevice(app fiber.Router, service device.IDeviceUsecase, authService domainAuth.IAuthUsecase, repo chatstorage.IChatStorageRepository) Device {
+	rest := Device{
+		Service:         service,
+		AuthService:     authService,
+		ChatStorageRepo: repo,
+	}
 
 	app.Get("/devices", rest.ListDevices)
 	app.Post("/devices", rest.AddDevice)
@@ -87,8 +95,26 @@ func (handler *Device) AddDevice(c fiber.Ctx) error {
 		}
 	}
 
+	user := middleware.GetUserFromCtx(c)
+	if user != nil && handler.AuthService != nil {
+		if err := handler.AuthService.ValidateUserDeviceQuota(c.Context(), user.ID); err != nil {
+			return c.Status(fiber.StatusForbidden).JSON(utils.ResponseData{
+				Status:  fiber.StatusForbidden,
+				Code:    "DEVICE_LIMIT_REACHED",
+				Message: err.Error(),
+			})
+		}
+	}
+
 	device, err := handler.Service.AddDevice(c.Context(), req.DeviceID, webhook)
 	utils.PanicIfNeeded(err)
+
+	if user != nil && handler.ChatStorageRepo != nil {
+		_ = handler.ChatStorageRepo.SaveDeviceRecord(&chatstorage.DeviceRecord{
+			DeviceID: device.ID,
+			UserID:   user.ID,
+		})
+	}
 
 	result := map[string]any{
 		"id":           device.ID,

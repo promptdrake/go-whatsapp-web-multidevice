@@ -31,12 +31,12 @@ func (controller *Chat) ListChats(c fiber.Ctx) error {
 	var request domainChat.ListChatsRequest
 
 	// Parse query parameters
-	request.Limit = fiber.Query[int](c, "limit", 25)
-	request.Offset = fiber.Query[int](c, "offset", 0)
+	request.Limit = fiber.Query(c, "limit", 25)
+	request.Offset = fiber.Query(c, "offset", 0)
 	request.Search = c.Query("search", "")
-	request.HasMedia = fiber.Query[bool](c, "has_media", false)
+	request.HasMedia = fiber.Query(c, "has_media", false)
 	if archivedStr := c.Query("archived"); archivedStr != "" {
-		isArchived := fiber.Query[bool](c, "archived")
+		isArchived := fiber.Query(c, "archived", false)
 		request.Archived = &isArchived
 	}
 
@@ -67,9 +67,9 @@ func (controller *Chat) GetChatMessages(c fiber.Ctx) error {
 	request.ChatJID = chatJID
 
 	// Parse query parameters
-	request.Limit = fiber.Query[int](c, "limit", 50)
-	request.Offset = fiber.Query[int](c, "offset", 0)
-	request.MediaOnly = fiber.Query[bool](c, "media_only", false)
+	request.Limit = fiber.Query(c, "limit", 50)
+	request.Offset = fiber.Query(c, "offset", 0)
+	request.MediaOnly = fiber.Query(c, "media_only", false)
 	request.Search = c.Query("search", "")
 
 	// Parse time filters

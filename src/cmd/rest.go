@@ -41,6 +41,7 @@ var restCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(restCmd)
+	rootCmd.Run = restServer
 }
 func restServer(_ *cobra.Command, _ []string) {
 	// registerMcpOAuth depends on these values being loaded after flag parsing.
@@ -81,6 +82,11 @@ func restServer(_ *cobra.Command, _ []string) {
 			return c.SendString("OK")
 		}
 		return c.Status(http.StatusServiceUnavailable).SendString("Service Unavailable")
+	})
+
+	// Favicon handler
+	app.Get("/favicon.ico", func(c fiber.Ctx) error {
+		return c.SendStatus(fiber.StatusNoContent)
 	})
 
 	// Chatwoot webhook - registered BEFORE basic auth middleware
@@ -138,11 +144,14 @@ func restServer(_ *cobra.Command, _ []string) {
 		apiGroup = app.Group(config.AppBasePath)
 	}
 
+	// SaaS Auth resolution middleware
+	app.Use(middleware.AuthResolverMiddleware(authUsecase))
+
 	registerDeviceScopedRoutes := func(r fiber.Router) {
 		rest.InitRestApp(r, appUsecase)
 		rest.InitRestCall(r, callUsecase)
 		rest.InitRestChat(r, chatUsecase)
-		rest.InitRestSend(r, sendUsecase)
+		rest.InitRestSend(r, sendUsecase, authUsecase)
 		rest.InitRestUser(r, userUsecase)
 		rest.InitRestMessage(r, messageUsecase, sendUsecase)
 		rest.InitRestGroup(r, groupUsecase)
@@ -150,8 +159,11 @@ func restServer(_ *cobra.Command, _ []string) {
 		websocket.RegisterRoutes(r, appUsecase)
 	}
 
+	// SaaS Auth & Plan routes
+	rest.InitRestAuth(apiGroup, authUsecase)
+
 	// Device management routes (no device_id required)
-	rest.InitRestDevice(apiGroup, deviceUsecase)
+	rest.InitRestDevice(apiGroup, deviceUsecase, authUsecase, chatStorageRepo)
 
 	// App info (version, limits) for standalone UIs; no device required
 	rest.InitRestAppInfo(apiGroup)
@@ -191,6 +203,8 @@ func restServer(_ *cobra.Command, _ []string) {
 	uiCtx, uiCancel := context.WithCancel(context.Background())
 	defer uiCancel()
 	registerUIRoute(apiGroup, uiCtx)
+	rest.RegisterSwaggerRoute(app)
+	rest.RegisterSwaggerRoute(apiGroup)
 
 	go websocket.RunHub()
 
@@ -202,6 +216,9 @@ func restServer(_ *cobra.Command, _ []string) {
 
 	// Set daily presence pulse scheduler when enabled
 	startPresencePulseSchedulerIfEnabled()
+
+	// Start automated 1st-of-month quota reset worker
+	startMonthlyQuotaResetScheduler(authUsecase)
 
 	// Listen in a goroutine so we can trap SIGINT/SIGTERM and drain the
 	// server cleanly. Without this, Fiber's Listen blocks until the OS
@@ -240,7 +257,7 @@ func restServer(_ *cobra.Command, _ []string) {
 	}
 }
 
-func registerUIRoute(apiGroup fiber.Router, ctx context.Context) {
+func registerUIRoute(apiGroup fiber.Router, _ context.Context) {
 	if !config.AppUIEnabled {
 		apiGroup.Get("/", func(c fiber.Ctx) error {
 			return c.JSON(utils.ResponseData{
@@ -252,41 +269,24 @@ func registerUIRoute(apiGroup fiber.Router, ctx context.Context) {
 		return
 	}
 
-	uiManager := uiasset.New(uiasset.Config{
-		Repo:         config.AppUIRepo,
-		AssetName:    config.AppUIAssetName,
-		CacheDir:     config.PathUICache,
-		GithubToken:  config.AppUIGithubToken,
-		Interval:     config.AppUIUpdateInterval,
-		PinnedSHA256: config.AppUIAssetSHA256,
-	})
-	if err := uiManager.LoadCache(); err != nil {
-		logrus.Infof("[UI_ASSET] no cached dashboard yet: %v", err)
-	}
-	if config.AppUIAutoUpdate {
-		go func() {
-			if err := uiManager.EnsureLatest(ctx); err != nil {
-				logrus.Warnf("[UI_ASSET] initial dashboard download failed: %v", err)
+	renderUI := func(c fiber.Ctx) error {
+		paths := []string{"ui/frontend/index.html", "storages/ui/index.html"}
+		for _, p := range paths {
+			if data, err := os.ReadFile(p); err == nil && len(data) > 0 {
+				c.Type("html")
+				c.Set(fiber.HeaderCacheControl, "no-cache")
+				return c.Send(data)
 			}
-		}()
-		go uiManager.StartAutoUpdate(ctx)
-	}
-
-	apiGroup.Get("/", func(c fiber.Ctx) error {
-		content, etag, ok := uiManager.Content()
-		if !ok {
-			c.Type("html")
-			return c.Send(uiasset.FallbackHTML(config.AppVersion, config.AppUIRepo))
-		}
-		quoted := `"` + etag + `"`
-		c.Set(fiber.HeaderCacheControl, "no-cache")
-		c.Set(fiber.HeaderETag, quoted)
-		if c.Get(fiber.HeaderIfNoneMatch) == quoted {
-			return c.SendStatus(fiber.StatusNotModified)
 		}
 		c.Type("html")
-		return c.Send(content)
-	})
+		return c.Send(uiasset.FallbackHTML(config.AppVersion, config.AppUIRepo))
+	}
+
+	apiGroup.Get("/", renderUI)
+	apiGroup.Get("/login", renderUI)
+	apiGroup.Get("/register", renderUI)
+	apiGroup.Get("/dashboard", renderUI)
+	apiGroup.Get("/admin", renderUI)
 }
 
 func newCORSMiddleware() fiber.Handler {

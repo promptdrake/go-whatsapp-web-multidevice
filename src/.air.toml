@@ -2,4 +2,8 @@ root = '.'
 tmp_dir = "tmp"
 
 [build]
-exclude_dir = ["statics", "storages"]
+cmd = "go build -tags purego -o ./tmp/main.exe ."
+bin = "tmp/main.exe"
+entrypoint = "tmp/main.exe"
+exclude_dir = ["statics", "storages", "tmp"]
+exclude_regex = ["_test\\.go$"]

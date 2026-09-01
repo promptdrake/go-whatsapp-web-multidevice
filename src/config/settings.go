@@ -18,6 +18,10 @@ var (
 	AppTrustedProxies      []string // Trusted proxy IP ranges (e.g., "0.0.0.0/0" for all, or specific CIDRs)
 	AppCORSAllowedOrigins  []string // CORS allowed origins; empty means "*" (any origin)
 
+	// SaaS Admin Initial Credentials (read from GOWA_EMAIL & GOWA_PASSWORD)
+	GowaEmail    = "admin@example.com"
+	GowaPassword = "admin"
+
 	// Web UI (gowa-ui) runtime download settings. The dashboard is a separate
 	// project released as a single HTML file; gowa fetches the latest release
 	// asset and serves it at "/".

@@ -1,18 +1,21 @@
 package rest
 
 import (
+	domainAuth "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/auth"
 	domainSend "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/send"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/ui/rest/middleware"
 	"github.com/gofiber/fiber/v3"
 )
 
 type Send struct {
-	Service domainSend.ISendUsecase
+	Service     domainSend.ISendUsecase
+	AuthService domainAuth.IAuthUsecase
 }
 
-func InitRestSend(app fiber.Router, service domainSend.ISendUsecase) Send {
-	rest := Send{Service: service}
+func InitRestSend(app fiber.Router, service domainSend.ISendUsecase, authService domainAuth.IAuthUsecase) Send {
+	rest := Send{Service: service, AuthService: authService}
 	app.Post("/send/message", rest.SendText)
 	app.Post("/send/image", rest.SendImage)
 	app.Post("/send/file", rest.SendFile)
@@ -28,7 +31,28 @@ func InitRestSend(app fiber.Router, service domainSend.ISendUsecase) Send {
 	return rest
 }
 
+func (controller *Send) checkBroadcastQuota(c fiber.Ctx) error {
+	if controller.AuthService == nil {
+		return nil
+	}
+	user := middleware.GetUserFromCtx(c)
+	if user != nil {
+		if err := controller.AuthService.ValidateUserSendQuota(c.Context(), user.ID, 1); err != nil {
+			return c.Status(fiber.StatusPaymentRequired).JSON(utils.ResponseData{
+				Status:  fiber.StatusPaymentRequired,
+				Code:    "MESSAGE_LIMIT_REACHED",
+				Message: err.Error(),
+			})
+		}
+		_ = controller.AuthService.IncrementUserMessageCount(c.Context(), user.ID, 1)
+	}
+	return nil
+}
+
 func (controller *Send) SendText(c fiber.Ctx) error {
+	if err := controller.checkBroadcastQuota(c); err != nil {
+		return err
+	}
 	var request domainSend.MessageRequest
 	err := c.Bind().Body(&request)
 	utils.PanicIfNeeded(err)
@@ -47,6 +71,9 @@ func (controller *Send) SendText(c fiber.Ctx) error {
 }
 
 func (controller *Send) SendImage(c fiber.Ctx) error {
+	if err := controller.checkBroadcastQuota(c); err != nil {
+		return err
+	}
 	var request domainSend.ImageRequest
 	request.Compress = true
 
@@ -72,6 +99,9 @@ func (controller *Send) SendImage(c fiber.Ctx) error {
 }
 
 func (controller *Send) SendFile(c fiber.Ctx) error {
+	if err := controller.checkBroadcastQuota(c); err != nil {
+		return err
+	}
 	var request domainSend.FileRequest
 	err := c.Bind().Body(&request)
 	utils.PanicIfNeeded(err)
@@ -95,6 +125,9 @@ func (controller *Send) SendFile(c fiber.Ctx) error {
 }
 
 func (controller *Send) SendVideo(c fiber.Ctx) error {
+	if err := controller.checkBroadcastQuota(c); err != nil {
+		return err
+	}
 	var request domainSend.VideoRequest
 	err := c.Bind().Body(&request)
 	utils.PanicIfNeeded(err)
@@ -118,6 +151,9 @@ func (controller *Send) SendVideo(c fiber.Ctx) error {
 }
 
 func (controller *Send) SendSticker(c fiber.Ctx) error {
+	if err := controller.checkBroadcastQuota(c); err != nil {
+		return err
+	}
 	var request domainSend.StickerRequest
 	err := c.Bind().Body(&request)
 	utils.PanicIfNeeded(err)
@@ -141,6 +177,9 @@ func (controller *Send) SendSticker(c fiber.Ctx) error {
 }
 
 func (controller *Send) SendContact(c fiber.Ctx) error {
+	if err := controller.checkBroadcastQuota(c); err != nil {
+		return err
+	}
 	var request domainSend.ContactRequest
 	err := c.Bind().Body(&request)
 	utils.PanicIfNeeded(err)
@@ -159,6 +198,9 @@ func (controller *Send) SendContact(c fiber.Ctx) error {
 }
 
 func (controller *Send) SendLink(c fiber.Ctx) error {
+	if err := controller.checkBroadcastQuota(c); err != nil {
+		return err
+	}
 	var request domainSend.LinkRequest
 	err := c.Bind().Body(&request)
 	utils.PanicIfNeeded(err)
@@ -177,6 +219,9 @@ func (controller *Send) SendLink(c fiber.Ctx) error {
 }
 
 func (controller *Send) SendLocation(c fiber.Ctx) error {
+	if err := controller.checkBroadcastQuota(c); err != nil {
+		return err
+	}
 	var request domainSend.LocationRequest
 	err := c.Bind().Body(&request)
 	utils.PanicIfNeeded(err)
@@ -195,6 +240,9 @@ func (controller *Send) SendLocation(c fiber.Ctx) error {
 }
 
 func (controller *Send) SendAudio(c fiber.Ctx) error {
+	if err := controller.checkBroadcastQuota(c); err != nil {
+		return err
+	}
 	var request domainSend.AudioRequest
 	err := c.Bind().Body(&request)
 	utils.PanicIfNeeded(err)
@@ -218,6 +266,9 @@ func (controller *Send) SendAudio(c fiber.Ctx) error {
 }
 
 func (controller *Send) SendPoll(c fiber.Ctx) error {
+	if err := controller.checkBroadcastQuota(c); err != nil {
+		return err
+	}
 	var request domainSend.PollRequest
 	err := c.Bind().Body(&request)
 	utils.PanicIfNeeded(err)

@@ -1,5 +1,6 @@
 services:
   whatsapp_go:
+    container_name: whatsapp_go
     logging:
       driver: "json-file"
       options:
@@ -12,7 +13,10 @@ services:
     ports:
       - "3000:3000"
     env_file:
-      - src/.env
+      - path: src/.env
+        required: false
+      - path: .env
+        required: false
     volumes:
       # Persist WhatsApp + chat DBs; entrypoint chowns for gowauser (uid 20001, gid 20000) on start.
       - ./storages:/app/storages

@@ -14,9 +14,6 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-// sendFileStubUsecase implements domainSend.ISendUsecase by embedding the
-// interface (so unrelated methods are never invoked by these tests) while
-// recording the FileRequest actually received by SendFile.
 type sendFileStubUsecase struct {
 	domainSend.ISendUsecase
 	receivedRequest domainSend.FileRequest

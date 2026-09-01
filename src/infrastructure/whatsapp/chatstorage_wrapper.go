@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	domainAuth "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/auth"
 	domainChatStorage "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/chatstorage"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
@@ -381,3 +382,141 @@ func (r *deviceChatStorage) SetDeviceWebhookConfig(deviceID string, config *doma
 func (r *deviceChatStorage) GetDeviceWebhookConfig(deviceID string) (*domainChatStorage.DeviceWebhookConfig, error) {
 	return r.base.GetDeviceWebhookConfig(deviceID)
 }
+
+func (r *deviceChatStorage) CreateUser(user *domainAuth.User) error {
+	return r.base.CreateUser(user)
+}
+
+func (r *deviceChatStorage) GetUserByEmail(email string) (*domainAuth.User, error) {
+	return r.base.GetUserByEmail(email)
+}
+
+func (r *deviceChatStorage) GetUserByID(id int64) (*domainAuth.User, error) {
+	return r.base.GetUserByID(id)
+}
+
+func (r *deviceChatStorage) UpdateUser(user *domainAuth.User) error {
+	return r.base.UpdateUser(user)
+}
+
+func (r *deviceChatStorage) UpdateUserTier(userID int64, tierID domainAuth.PlanID, tierName string, expiresAt *time.Time) error {
+	return r.base.UpdateUserTier(userID, tierID, tierName, expiresAt)
+}
+
+func (r *deviceChatStorage) IncrementMessageCount(userID int64, count int) error {
+	return r.base.IncrementMessageCount(userID, count)
+}
+
+func (r *deviceChatStorage) IncrementBroadcastCount(userID int64, count int) error {
+	return r.base.IncrementBroadcastCount(userID, count)
+}
+
+func (r *deviceChatStorage) ResetDailyMessageQuotas(ctx context.Context, period string) (int64, error) {
+	return r.base.ResetDailyMessageQuotas(ctx, period)
+}
+
+func (r *deviceChatStorage) ResetMonthlyBroadcastQuotas(ctx context.Context, period string) (int64, error) {
+	return r.base.ResetMonthlyBroadcastQuotas(ctx, period)
+}
+
+func (r *deviceChatStorage) ResetMonthlyQuotas(ctx context.Context, period string) (int64, error) {
+	return r.base.ResetMonthlyQuotas(ctx, period)
+}
+
+func (r *deviceChatStorage) IsPeriodQuotaReset(ctx context.Context, period string) (bool, error) {
+	return r.base.IsPeriodQuotaReset(ctx, period)
+}
+
+func (r *deviceChatStorage) ManualResetAllQuotas(ctx context.Context) (int64, error) {
+	return r.base.ManualResetAllQuotas(ctx)
+}
+
+func (r *deviceChatStorage) ListUsers() ([]*domainAuth.User, error) {
+	return r.base.ListUsers()
+}
+
+func (r *deviceChatStorage) DeleteUser(userID int64) error {
+	return r.base.DeleteUser(userID)
+}
+
+func (r *deviceChatStorage) CountDevicesByUserID(userID int64) (int, error) {
+	return r.base.CountDevicesByUserID(userID)
+}
+
+func (r *deviceChatStorage) ListDeviceRecordsByUserID(userID int64) ([]*domainChatStorage.DeviceRecord, error) {
+	return r.base.ListDeviceRecordsByUserID(userID)
+}
+
+func (r *deviceChatStorage) CreateApiKey(apiKey *domainAuth.ApiKey) error {
+	return r.base.CreateApiKey(apiKey)
+}
+
+func (r *deviceChatStorage) GetApiKeysByUserID(userID int64) ([]*domainAuth.ApiKey, error) {
+	return r.base.GetApiKeysByUserID(userID)
+}
+
+func (r *deviceChatStorage) GetApiKeyByValue(keyValue string) (*domainAuth.ApiKey, error) {
+	return r.base.GetApiKeyByValue(keyValue)
+}
+
+func (r *deviceChatStorage) DeleteApiKey(id, userID int64) error {
+	return r.base.DeleteApiKey(id, userID)
+}
+
+func (r *deviceChatStorage) CreateUserWebhook(webhook *domainAuth.UserWebhook) error {
+	return r.base.CreateUserWebhook(webhook)
+}
+
+func (r *deviceChatStorage) GetUserWebhooksByUserID(userID int64) ([]*domainAuth.UserWebhook, error) {
+	return r.base.GetUserWebhooksByUserID(userID)
+}
+
+func (r *deviceChatStorage) DeleteUserWebhook(id, userID int64) error {
+	return r.base.DeleteUserWebhook(id, userID)
+}
+
+func (r *deviceChatStorage) GetAllPlans() ([]domainAuth.Plan, error) {
+	return r.base.GetAllPlans()
+}
+
+func (r *deviceChatStorage) GetPlanByID(id domainAuth.PlanID) (*domainAuth.Plan, error) {
+	return r.base.GetPlanByID(id)
+}
+
+func (r *deviceChatStorage) CreatePlan(plan *domainAuth.Plan) error {
+	return r.base.CreatePlan(plan)
+}
+
+func (r *deviceChatStorage) UpdatePlan(plan *domainAuth.Plan) error {
+	return r.base.UpdatePlan(plan)
+}
+
+func (r *deviceChatStorage) DeletePlan(id domainAuth.PlanID) error {
+	return r.base.DeletePlan(id)
+}
+
+func (r *deviceChatStorage) GetActiveAutoResponses(ctx context.Context, deviceID string) ([]domainAuth.AutoResponse, error) {
+	targetDeviceID := deviceID
+	if targetDeviceID == "" {
+		targetDeviceID = r.deviceID
+	}
+	return r.base.GetActiveAutoResponses(ctx, targetDeviceID)
+}
+
+func (r *deviceChatStorage) GetUserAutoResponses(ctx context.Context, userID int64) ([]domainAuth.AutoResponse, error) {
+	return r.base.GetUserAutoResponses(ctx, userID)
+}
+
+func (r *deviceChatStorage) CreateAutoResponse(ctx context.Context, ar *domainAuth.AutoResponse) error {
+	return r.base.CreateAutoResponse(ctx, ar)
+}
+
+func (r *deviceChatStorage) UpdateAutoResponse(ctx context.Context, ar *domainAuth.AutoResponse) error {
+	return r.base.UpdateAutoResponse(ctx, ar)
+}
+
+func (r *deviceChatStorage) DeleteAutoResponse(ctx context.Context, id int64, userID int64) error {
+	return r.base.DeleteAutoResponse(ctx, id, userID)
+}
+
+

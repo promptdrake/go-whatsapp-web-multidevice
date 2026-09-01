@@ -806,7 +806,7 @@ func (h *ChatwootHandler) SyncHistory(c fiber.Ctx) error {
 		req.DeviceID = c.Query("device_id", config.ChatwootDeviceID)
 	}
 	if req.DaysLimit <= 0 {
-		req.DaysLimit = fiber.Query[int](c, "days", config.ChatwootDaysLimitImportMessages)
+		req.DaysLimit = fiber.Query(c, "days", config.ChatwootDaysLimitImportMessages)
 	}
 
 	// Resolve device
@@ -863,12 +863,12 @@ func (h *ChatwootHandler) SyncHistory(c fiber.Ctx) error {
 	if req.IncludeMedia != nil {
 		opts.IncludeMedia = *req.IncludeMedia
 	} else if c.Query("media") != "" {
-		opts.IncludeMedia = fiber.Query[bool](c, "media", opts.IncludeMedia)
+		opts.IncludeMedia = fiber.Query(c, "media", opts.IncludeMedia)
 	}
 	if req.IncludeGroups != nil {
 		opts.IncludeGroups = *req.IncludeGroups
 	} else if c.Query("groups") != "" {
-		opts.IncludeGroups = fiber.Query[bool](c, "groups", opts.IncludeGroups)
+		opts.IncludeGroups = fiber.Query(c, "groups", opts.IncludeGroups)
 	}
 
 	// Start async sync

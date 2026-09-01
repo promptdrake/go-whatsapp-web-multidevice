@@ -3,8 +3,10 @@ package cmd
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
+	domainAuth "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/auth"
 	domainChatStorage "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/chatstorage"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/chatwoot"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
@@ -95,4 +97,37 @@ func startPresencePulseSchedulerIfEnabled() {
 		)
 		logrus.Infof("presence pulse scheduler started; interval=%s duration=%s", config.WhatsappPresencePulseInterval, config.WhatsappPresencePulseDuration)
 	})
+}
+
+// startMonthlyQuotaResetScheduler starts a background worker that checks and resets user quotas daily (direct messages) and monthly on the 1st (broadcasts).
+func startMonthlyQuotaResetScheduler(authSvc domainAuth.IAuthUsecase) {
+	if authSvc == nil {
+		return
+	}
+
+	go func() {
+		// Run initial check upon boot
+		ctx := context.Background()
+		if err := authSvc.CheckAndPerformDailyReset(ctx); err != nil {
+			logrus.Errorf("[DAILY_QUOTA_RESET] Startup check error: %v", err)
+		}
+		if err := authSvc.CheckAndPerformMonthlyReset(ctx); err != nil {
+			logrus.Errorf("[MONTHLY_QUOTA_RESET] Startup check error: %v", err)
+		}
+
+		// Check every 15 minutes to reliably detect day and month rollover at midnight (00:00)
+		ticker := time.NewTicker(15 * time.Minute)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			bgCtx := context.Background()
+			if err := authSvc.CheckAndPerformDailyReset(bgCtx); err != nil {
+				logrus.Errorf("[DAILY_QUOTA_RESET] Ticker check error: %v", err)
+			}
+			if err := authSvc.CheckAndPerformMonthlyReset(bgCtx); err != nil {
+				logrus.Errorf("[MONTHLY_QUOTA_RESET] Ticker check error: %v", err)
+			}
+		}
+	}()
+	logrus.Infof("[AUTOMATED_QUOTA_RESET] Automated quota reset scheduler initialized (Daily Direct Messages + Monthly 1st Broadcasts active)")
 }

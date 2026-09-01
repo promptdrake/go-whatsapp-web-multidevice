@@ -29,6 +29,8 @@ import (
 )
 
 var knownDocumentMIMEByExtension = map[string]string{
+	".pdf":  "application/pdf",
+	".zip":  "application/zip",
 	".doc":  "application/msword",
 	".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 	".xls":  "application/vnd.ms-excel",

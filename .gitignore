@@ -8,15 +8,25 @@ src/gowa
 # Build artifacts
 src/pkged.go
 
-# Database
+# Database & Storage files
 *.db
+*.db-*
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
 storages/
+src/storages/
 
 # Environment
 .env
+src/.env
+*.env.local
 
 # Runtime media & QR codes
 statics/
+src/statics/
+
 
 # History files
 history-*.json

@@ -29,14 +29,21 @@ func InitWaDB(ctx context.Context, DBURI string) *sqlstore.Container {
 // initDatabase creates and returns a database store container based on the configured URI
 func initDatabase(ctx context.Context, dbLog waLog.Logger, DBURI string) (*sqlstore.Container, error) {
 	// Strip surrounding quotes that may come from .env file parsing
-	DBURI = strings.Trim(DBURI, `"'`)
+	DBURI = strings.TrimSpace(strings.Trim(DBURI, `"'`))
+	if DBURI == "" {
+		DBURI = config.DBURI
+		if DBURI == "" {
+			DBURI = "file:storages/whatsapp.db"
+		}
+	}
 
-	if strings.HasPrefix(DBURI, "file:") {
-		DBURI = sqlite.FormatChatStorageURI(DBURI, true, true)
-		return sqlstore.New(ctx, sqlite.DriverName, DBURI, dbLog)
-	} else if strings.HasPrefix(DBURI, "postgres:") {
+	if strings.HasPrefix(DBURI, "postgres:") || strings.HasPrefix(DBURI, "postgresql:") {
 		return sqlstore.New(ctx, "postgres", DBURI, dbLog)
 	}
 
-	return nil, fmt.Errorf("unknown database type: %s. Currently only sqlite3(file:) and postgres are supported", DBURI)
+	if !strings.HasPrefix(DBURI, "file:") {
+		DBURI = "file:" + DBURI
+	}
+	DBURI = sqlite.FormatChatStorageURI(DBURI, true, true)
+	return sqlstore.New(ctx, sqlite.DriverName, DBURI, dbLog)
 }

@@ -1,0 +1,2895 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multi-Device WhatsApp SaaS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              400: '#22d3ee',
+              500: '#06b6d4',
+              600: '#0891b2',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+
+    body,
+    aside,
+    main,
+    div,
+    button,
+    input,
+    select,
+    textarea,
+    table,
+    th,
+    td,
+    span,
+    p,
+    h1,
+    h2,
+    h3,
+    h4 {
+      transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #71717a;
+      border-radius: 4px;
+    }
+
+    .dark ::-webkit-scrollbar-thumb {
+      background: #27272a;
+    }
+  </style>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+</head>
+
+<body
+  class="min-h-screen antialiased bg-zinc-100 dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 selection:bg-cyan-500 selection:text-black">
+  <div id="app" v-cloak class="min-h-screen flex flex-col">
+
+    <!-- Toast Alert -->
+    <div v-if="toast.show" class="fixed top-5 right-5 z-50 transition-all duration-200">
+      <div :class="[
+        'px-4 py-3 rounded-lg shadow-xl flex items-center gap-3 border text-sm max-w-md backdrop-blur-md',
+        toast.type === 'error' ? 'bg-red-50 dark:bg-red-950/90 border-red-300 dark:border-red-800 text-red-700 dark:text-red-200' :
+        toast.type === 'success' ? 'bg-white dark:bg-zinc-900 border-cyan-500/50 text-cyan-700 dark:text-cyan-200' :
+        'bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200'
+      ]">
+        <i v-if="toast.type === 'error'" data-lucide="alert-circle" class="w-4 h-4 text-red-500 shrink-0"></i>
+        <i v-else data-lucide="check" class="w-4 h-4 text-cyan-500 shrink-0"></i>
+        <div class="leading-snug text-xs font-medium">{{ toast.message }}</div>
+        <button @click="toast.show = false"
+          class="ml-auto text-zinc-400 hover:text-zinc-600 dark:hover:text-white">&times;</button>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- AUTH SCREEN (Laravel Breeze Style Login - Minimalist & Smooth)            -->
+    <!-- ========================================================================= -->
+    <div v-if="!isAuthenticated"
+      class="min-h-screen flex flex-col justify-center items-center p-6 bg-zinc-100 dark:bg-[#09090b] relative">
+      <!-- Top Theme Switcher -->
+      <div class="absolute top-5 right-5">
+        <button @click="toggleTheme"
+          class="p-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 hover:text-cyan-500 transition-colors shadow-sm"
+          :title="isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'">
+          <i :data-lucide="isDark ? 'sun' : 'moon'" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Logo Header -->
+      <div class="mb-6 text-center">
+        <img src="https://id-cdn.aisbirnusantara.com/documentation/logoneww.png" alt="Aisbir Logo"
+          class="h-11 w-auto mx-auto object-contain">
+      </div>
+
+      <!-- Card Container -->
+      <div
+        class="w-full max-w-sm bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800/80 rounded-xl p-6 sm:p-8 shadow-sm">
+        <form @submit.prevent="handleLogin" class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Email</label>
+            <input v-model="loginForm.email" type="email" required placeholder="you@example.com"
+              class="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all">
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Password</label>
+            <input v-model="loginForm.password" type="password" required placeholder="••••••••"
+              class="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all">
+          </div>
+
+          <div class="flex items-center justify-between pt-1">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input v-model="loginForm.remember" type="checkbox"
+                class="w-4 h-4 rounded border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-cyan-500 focus:ring-cyan-500/20">
+              <span class="text-xs text-zinc-600 dark:text-zinc-400">Remember me</span>
+            </label>
+          </div>
+
+          <button type="submit" :disabled="authLoading"
+            class="w-full mt-2 py-2.5 px-4 bg-cyan-500 hover:bg-cyan-400 active:bg-cyan-600 text-zinc-950 font-semibold text-xs rounded-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm">
+            <span v-if="authLoading">Signing in...</span>
+            <span v-else>Log in</span>
+          </button>
+        </form>
+      </div>
+
+      <div class="mt-6 text-center text-xs text-zinc-400 dark:text-zinc-600">
+        &copy; Aisbir Nusantara &middot; Multi-Device WhatsApp SaaS
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- MAIN APPLICATION WORKSPACE                                                -->
+    <!-- ========================================================================= -->
+    <div v-else class="min-h-screen flex flex-col md:flex-row bg-zinc-100 dark:bg-[#09090b]">
+
+      <!-- MOBILE TOP NAVBAR -->
+      <div
+        class="md:hidden flex items-center justify-between p-3.5 bg-white dark:bg-[#0d0d10] border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-30">
+        <button @click="mobileSidebarOpen = true"
+          class="p-1.5 rounded-lg text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+          <i data-lucide="menu" class="w-5 h-5"></i>
+        </button>
+        <img src="https://id-cdn.aisbirnusantara.com/documentation/logoneww.png" alt="Aisbir"
+          class="h-6 w-auto object-contain">
+        <button @click="toggleTheme"
+          class="p-1.5 rounded-lg text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800">
+          <i :data-lucide="isDark ? 'sun' : 'moon'" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- MOBILE DRAWER BACKDROP -->
+      <div v-if="mobileSidebarOpen" @click="mobileSidebarOpen = false"
+        class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"></div>
+
+      <!-- SIDEBAR -->
+      <aside :class="[
+        'app-sidebar-container flex flex-col shrink-0 p-4 z-50 transition-transform duration-200',
+        'bg-white dark:bg-[#0d0d10] border-r border-zinc-200 dark:border-zinc-800',
+        'fixed inset-y-0 left-0 w-64 md:static md:translate-x-0',
+        mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+      ]">
+        <!-- Mobile Drawer Close Button -->
+        <div class="md:hidden flex justify-end mb-2">
+          <button @click="mobileSidebarOpen = false"
+            class="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-white">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <!-- Logo Only Header -->
+        <div class="flex items-center justify-center py-2 mb-6">
+          <img src="https://id-cdn.aisbirnusantara.com/documentation/logoneww.png" alt="Aisbir"
+            class="h-8 w-auto object-contain">
+        </div>
+
+        <!-- Plan Badge & Tier Status -->
+        <div class="mb-5 p-3 rounded-xl bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800">
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-zinc-500 dark:text-zinc-400 text-[11px]">Subscription</span>
+            <span
+              class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 uppercase">
+              {{ currentUser.tier_name || (currentUser.role === 'admin' ? 'Sea' : 'None') }}
+            </span>
+          </div>
+
+          <div v-if="currentUser.role !== 'admin'" class="mt-2 text-xs">
+            <div v-if="currentUser.has_active_tier" class="text-zinc-500 dark:text-zinc-400 flex justify-between">
+              <span>Remaining:</span>
+              <span class="text-zinc-900 dark:text-zinc-200 font-mono font-medium">{{ currentUser.days_remaining
+                }}d</span>
+            </div>
+            <div v-else class="text-amber-600 dark:text-amber-400 text-[11px]">
+              No active subscription
+            </div>
+            <button @click="openPlanModal = true; mobileSidebarOpen = false"
+              class="w-full mt-2 py-1 px-2 text-[11px] font-medium rounded transition-colors text-center"
+              :class="currentUser.has_active_tier ? 'bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-300' : 'bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-bold'">
+              {{ currentUser.has_active_tier ? 'Manage Plan' : 'Select Plan' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Navigation Links -->
+        <nav class="space-y-1 flex-1 overflow-y-auto">
+          <button @click="setActiveTab('overview')"
+            :class="['w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors', activeTab === 'overview' ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900']">
+            <i data-lucide="layout-dashboard" class="w-4 h-4 shrink-0"></i>
+            <span>Overview</span>
+          </button>
+
+          <button @click="setActiveTab('devices')"
+            :class="['w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors', activeTab === 'devices' ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900']">
+            <i data-lucide="smartphone" class="w-4 h-4 shrink-0"></i>
+            <span>Devices</span>
+            <span class="ml-auto text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+              {{ devices.length }}/{{ currentUser.device_limit || (currentUser.role === 'admin' ? '∞' : 2) }}
+            </span>
+          </button>
+
+          <button @click="setActiveTab('broadcast')"
+            :class="['w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors', activeTab === 'broadcast' ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900']">
+            <i data-lucide="send" class="w-4 h-4 shrink-0"></i>
+            <span>Broadcast</span>
+          </button>
+
+          <button @click="setActiveTab('chats')"
+            :class="['w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors', activeTab === 'chats' ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900']">
+            <i data-lucide="message-square" class="w-4 h-4 shrink-0"></i>
+            <span>Chats & History</span>
+          </button>
+
+          <button @click="setActiveTab('auto-response')"
+            :class="['w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors', activeTab === 'auto-response' ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900']">
+            <i data-lucide="bot" class="w-4 h-4 shrink-0"></i>
+            <span>Auto Response</span>
+            <span v-if="autoResponses.length > 0"
+              class="ml-auto text-[10px] font-mono px-1.5 py-0.5 bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20 rounded">
+              {{ autoResponses.length }}
+            </span>
+          </button>
+
+          <button @click="setActiveTab('developer')"
+            :class="['w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors', activeTab === 'developer' ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900']">
+            <i data-lucide="code-2" class="w-4 h-4 shrink-0"></i>
+            <span>API & Webhooks</span>
+          </button>
+
+          <a href="/swags" target="_blank"
+            class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-cyan-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors">
+            <i data-lucide="book-open" class="w-4 h-4 shrink-0"></i>
+            <span>Swagger API</span>
+            <span class="ml-auto text-[10px] font-mono text-cyan-500">Docs ↗</span>
+          </a>
+
+          <!-- Admin Section -->
+          <div v-if="currentUser.role === 'admin'"
+            class="pt-4 mt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-1">
+            <div
+              class="px-3 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
+              Management</div>
+            <button @click="setActiveTab('admin-users')"
+              :class="['w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors', activeTab === 'admin-users' ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900']">
+              <i data-lucide="users" class="w-4 h-4 shrink-0"></i>
+              <span>User Accounts</span>
+            </button>
+            <button @click="setActiveTab('admin-plans')"
+              :class="['w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-colors', activeTab === 'admin-plans' ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30' : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-900']">
+              <i data-lucide="sliders" class="w-4 h-4 shrink-0"></i>
+              <span>Plans & Quotas</span>
+            </button>
+            <a href="/swagss" target="_blank"
+              class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-cyan-500 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors">
+              <i data-lucide="shield-alert" class="w-4 h-4 shrink-0"></i>
+              <span>Admin Swagger</span>
+              <span class="ml-auto text-[10px] font-mono text-cyan-500">Docs ↗</span>
+            </a>
+          </div>
+        </nav>
+
+        <!-- Sidebar Footer -->
+        <div class="pt-3 mt-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2">
+          <div class="overflow-hidden flex-1">
+            <div class="text-xs font-semibold text-zinc-900 dark:text-white truncate">{{ currentUser.full_name }}</div>
+            <div class="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">{{ currentUser.email }}</div>
+          </div>
+
+          <div class="flex items-center gap-1">
+            <button @click="toggleTheme"
+              class="p-1.5 text-zinc-500 dark:text-zinc-400 hover:text-cyan-500 dark:hover:text-cyan-400 rounded hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors"
+              :title="isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'">
+              <i :data-lucide="isDark ? 'sun' : 'moon'" class="w-4 h-4"></i>
+            </button>
+
+            <button @click="logout" title="Sign Out"
+              class="p-1.5 text-zinc-500 dark:text-zinc-400 hover:text-red-500 rounded hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors">
+              <i data-lucide="log-out" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- MAIN CONTENT -->
+      <main class="flex-1 flex flex-col p-4 sm:p-6 md:p-8 overflow-y-auto max-w-6xl w-full mx-auto">
+
+        <!-- Banner for Inactive Subscription -->
+        <div v-if="!currentUser.has_active_tier && currentUser.role !== 'admin'"
+          class="mb-6 p-4 rounded-xl bg-white dark:bg-zinc-900 border border-cyan-500/40 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div>
+            <div class="font-semibold text-sm text-zinc-900 dark:text-white">Select a subscription plan to start</div>
+            <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Choose an active plan to start adding WhatsApp
+              instances and broadcast workflows.</div>
+          </div>
+          <button @click="openPlanModal = true"
+            class="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-semibold text-xs shrink-0 transition-colors shadow-sm">
+            Choose Plan
+          </button>
+        </div>
+
+        <!-- =================================================================== -->
+        <!-- TAB 1: OVERVIEW                                                     -->
+        <!-- =================================================================== -->
+        <div v-if="activeTab === 'overview'" class="space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 class="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">Overview</h2>
+              <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Summary of WhatsApp accounts and subscription
+                usage.</p>
+            </div>
+            <div class="flex items-center gap-2.5">
+              <button @click="fetchInitialData"
+                class="px-3 py-1.5 rounded-lg bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-medium border border-zinc-200 dark:border-zinc-800 transition-colors flex items-center gap-1.5 shadow-sm">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                <span>Refresh</span>
+              </button>
+              <button @click="openAddDeviceModal = true"
+                :disabled="!currentUser.has_active_tier && currentUser.role !== 'admin'"
+                class="px-3.5 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-zinc-950 text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-sm">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                <span>Add Device</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Stat Metric Cards -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+            <div
+              class="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 shadow-sm">
+              <div class="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                Subscription Tier</div>
+              <div class="text-xl font-bold text-zinc-900 dark:text-white mt-1.5 flex items-center gap-2">
+                <span>{{ currentUser.tier_name || (currentUser.role === 'admin' ? 'Sea' : 'None') }}</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded font-mono font-medium"
+                  :class="currentUser.has_active_tier || currentUser.role === 'admin' ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'">
+                  {{ currentUser.has_active_tier || currentUser.role === 'admin' ? 'ACTIVE' : 'INACTIVE' }}
+                </span>
+              </div>
+              <div class="text-xs text-zinc-500 mt-1 font-mono">
+                {{ currentUser.role === 'admin' ? 'Lifetime Admin' : (currentUser.days_remaining + ' days left') }}
+              </div>
+            </div>
+
+            <div
+              class="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 shadow-sm">
+              <div class="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Device
+                Slots</div>
+              <div class="text-xl font-bold text-zinc-900 dark:text-white mt-1.5 font-mono">
+                {{ devices.length }} <span class="text-zinc-400 dark:text-zinc-500 text-sm font-normal">/ {{
+                  currentUser.device_limit || (currentUser.role === 'admin' ? '∞' : 2) }}</span>
+              </div>
+              <div class="w-full bg-zinc-200 dark:bg-zinc-800 rounded-full h-1 mt-2.5 overflow-hidden">
+                <div class="bg-cyan-500 h-1 rounded-full"
+                  :style="{ width: Math.min(100, (devices.length / (currentUser.device_limit || 2)) * 100) + '%' }">
+                </div>
+              </div>
+            </div>
+
+            <div
+              class="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 shadow-sm">
+              <div class="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Direct
+                Message Limit</div>
+              <div class="text-xl font-bold text-zinc-900 dark:text-white mt-1.5 font-mono">
+                {{ currentUser.message_count || 0 }}
+                <span class="text-zinc-400 dark:text-zinc-500 text-sm font-normal">/ {{ currentUser.message_limit === -1
+                  ? 'Unlimited' : ((currentUser.message_limit || 100) + ' /day') }}</span>
+              </div>
+              <div class="w-full bg-zinc-200 dark:bg-zinc-800 rounded-full h-1 mt-2.5 overflow-hidden">
+                <div class="bg-cyan-500 h-1 rounded-full"
+                  :style="{ width: currentUser.message_limit === -1 ? '15%' : Math.min(100, ((currentUser.message_count || 0) / (currentUser.message_limit || 100)) * 100) + '%' }">
+                </div>
+              </div>
+              <div class="text-[11px] text-zinc-500 mt-1 font-mono">
+                {{ currentUser.message_limit === -1 ? 'Unlimited (resets daily)' : (Math.max(0, (currentUser.message_limit || 100) - (currentUser.message_count || 0)) + ' msgs left today (resets 00:00)') }}
+              </div>
+            </div>
+
+            <div
+              class="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 shadow-sm">
+              <div class="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Broadcast
+                Campaigns</div>
+              <div class="text-xl font-bold text-zinc-900 dark:text-white mt-1.5 font-mono">
+                {{ currentUser.broadcast_count || 0 }}
+                <span class="text-zinc-400 dark:text-zinc-500 text-sm font-normal">/ {{ currentUser.broadcast_limit === -1 ? 'Unlimited' : (Number(currentUser.broadcast_limit || 5000).toLocaleString() + ' /mo') }}</span>
+              </div>
+              <div class="w-full bg-zinc-200 dark:bg-zinc-800 rounded-full h-1 mt-2.5 overflow-hidden">
+                <div class="bg-cyan-500 h-1 rounded-full"
+                  :style="{ width: currentUser.broadcast_limit === -1 ? '15%' : Math.min(100, ((currentUser.broadcast_count || 0) / (currentUser.broadcast_limit || 5000)) * 100) + '%' }">
+                </div>
+              </div>
+              <div class="text-[11px] text-zinc-500 mt-1 font-mono">
+                {{ currentUser.broadcast_limit === -1 ? 'Unlimited broadcasts' : (Math.max(0, (currentUser.broadcast_limit || 5000) - (currentUser.broadcast_count || 0)) + ' left (resets 1st of month)') }}
+              </div>
+            </div>
+
+            <div
+              class="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 shadow-sm">
+              <div class="text-[11px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">API Keys &
+                Webhooks</div>
+              <div class="text-xl font-bold text-zinc-900 dark:text-white mt-1.5 font-mono">
+                {{ apiKeys.length }} <span
+                  class="text-xs text-zinc-500 dark:text-zinc-400 font-sans font-normal">keys</span> · {{
+                webhooks.length }} <span
+                  class="text-xs text-zinc-500 dark:text-zinc-400 font-sans font-normal">hooks</span>
+              </div>
+              <div class="text-xs text-zinc-500 mt-1 font-mono">
+                Max {{ currentUser.api_key_limit || 1 }} keys / {{ currentUser.webhook_limit || 1 }} hooks
+              </div>
+            </div>
+          </div>
+
+          <!-- Active Instances Section -->
+          <div class="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-sm font-semibold text-zinc-900 dark:text-white">Connected WhatsApp Instances</h3>
+              <button @click="setActiveTab('devices')"
+                class="text-xs text-cyan-600 dark:text-cyan-400 hover:underline font-medium">View all →</button>
+            </div>
+
+            <div v-if="devices.length === 0"
+              class="text-center py-10 border border-dashed border-zinc-300 dark:border-zinc-800 rounded-lg">
+              <div class="text-xs text-zinc-500 dark:text-zinc-400">No WhatsApp devices added yet.</div>
+              <button @click="openAddDeviceModal = true"
+                :disabled="!currentUser.has_active_tier && currentUser.role !== 'admin'"
+                class="mt-3 px-3.5 py-1.5 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-zinc-950 font-semibold text-xs rounded-lg transition-colors shadow-sm">
+                + Add Device Slot
+              </button>
+            </div>
+
+            <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div v-for="dev in devices" :key="dev.id"
+                class="p-3.5 bg-zinc-50 dark:bg-zinc-900/80 border border-zinc-200 dark:border-zinc-800 rounded-xl flex flex-col justify-between shadow-sm">
+                <div>
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-mono font-semibold text-zinc-900 dark:text-zinc-200 truncate">{{ dev.id
+                      }}</span>
+                    <span :class="[
+                      'text-[10px] font-mono px-1.5 py-0.5 rounded font-medium flex items-center gap-1',
+                      isDeviceOnline(dev) ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
+                    ]">
+                      <span class="w-1.5 h-1.5 rounded-full"
+                        :class="isDeviceOnline(dev) ? 'bg-cyan-500 animate-pulse' : 'bg-zinc-400'"></span>
+                      {{ isDeviceOnline(dev) ? 'ONLINE' : 'OFFLINE' }}
+                    </span>
+                  </div>
+                  <div class="text-xs text-zinc-500 dark:text-zinc-400 mt-1 font-mono truncate">
+                    {{ dev.jid || 'Unpaired' }}
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-2 mt-3 pt-2.5 border-t border-zinc-200 dark:border-zinc-800/80">
+                  <button @click="openQRModal(dev.id)"
+                    class="flex-1 py-1 px-2 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 text-xs font-medium rounded-lg transition-colors text-center">
+                    Pair QR
+                  </button>
+                  <button @click="openCodeModal(dev.id)"
+                    class="py-1 px-2.5 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-medium rounded-lg transition-colors">
+                    Code
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- =================================================================== -->
+        <!-- TAB 2: DEVICES                                                      -->
+        <!-- =================================================================== -->
+        <div v-if="activeTab === 'devices'" class="space-y-5">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 class="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">WhatsApp Devices</h2>
+              <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                Current plan allows up to <strong>{{ currentUser.device_limit || (currentUser.role === 'admin' ?
+                  'Unlimited' : 2) }}</strong> device instances. Real-time status updates enabled.
+              </p>
+            </div>
+            <button @click="openAddDeviceModal = true"
+              :disabled="!currentUser.has_active_tier && currentUser.role !== 'admin'"
+              class="px-3.5 py-2 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-zinc-950 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 self-start shadow-sm">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+              <span>Add Device Slot</span>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div v-for="dev in devices" :key="dev.id"
+              class="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 flex flex-col justify-between shadow-sm">
+              <div>
+                <div class="flex items-start justify-between">
+                  <div>
+                    <h4 class="font-semibold text-sm text-zinc-900 dark:text-white">{{ dev.display_name || dev.id }}
+                    </h4>
+                    <p class="text-xs font-mono text-zinc-500 dark:text-zinc-400 mt-0.5 truncate max-w-[160px]">{{
+                      dev.id }}</p>
+                  </div>
+                  <span :class="[
+                    'text-[10px] font-mono px-2 py-0.5 rounded font-medium flex items-center gap-1.5',
+                    isDeviceOnline(dev) ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20' : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
+                  ]">
+                    <span class="w-1.5 h-1.5 rounded-full"
+                      :class="isDeviceOnline(dev) ? 'bg-cyan-500 animate-pulse' : 'bg-zinc-400'"></span>
+                    {{ isDeviceOnline(dev) ? 'CONNECTED' : 'DISCONNECTED' }}
+                  </span>
+                </div>
+
+                <div
+                  class="mt-3.5 p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 space-y-1 text-xs">
+                  <div class="flex justify-between text-zinc-500 dark:text-zinc-400">
+                    <span>JID:</span>
+                    <span class="font-mono text-zinc-800 dark:text-zinc-200 truncate max-w-[140px]">{{ dev.jid || '-'
+                      }}</span>
+                  </div>
+                  <div class="flex justify-between text-zinc-500 dark:text-zinc-400">
+                    <span>State:</span>
+                    <span class="font-mono text-zinc-800 dark:text-zinc-300 capitalize">{{ isDeviceOnline(dev) ?
+                      'connected' : (dev.state || 'disconnected') }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-4 pt-3 border-t border-zinc-200 dark:border-zinc-800 space-y-2">
+                <div class="grid grid-cols-2 gap-2">
+                  <button @click="openQRModal(dev.id)"
+                    class="py-1.5 px-3 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 font-medium text-xs rounded-lg transition-colors text-center">
+                    Pair QR
+                  </button>
+                  <button @click="openCodeModal(dev.id)"
+                    class="py-1.5 px-3 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium text-xs rounded-lg transition-colors text-center">
+                    Pair Code
+                  </button>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button @click="reconnectDevice(dev.id)"
+                    class="flex-1 py-1 px-2 bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs rounded border border-zinc-200 dark:border-zinc-800 transition-colors">
+                    Reconnect
+                  </button>
+                  <button @click="logoutDevice(dev.id)"
+                    class="flex-1 py-1 px-2 bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs rounded border border-zinc-200 dark:border-zinc-800 transition-colors">
+                    Logout
+                  </button>
+                  <button @click="deleteDevice(dev.id)"
+                    class="p-1 text-zinc-400 hover:text-red-500 rounded transition-colors" title="Delete Device">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- =================================================================== -->
+        <!-- TAB 3: BROADCAST                                                    -->
+        <!-- =================================================================== -->
+        <div v-if="activeTab === 'broadcast'" class="space-y-5">
+          <div>
+            <h2 class="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">Broadcast Messages</h2>
+            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Send single or bulk WhatsApp messages.</p>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            <div
+              class="lg:col-span-2 bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 space-y-4 shadow-sm">
+              <div>
+                <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Sender Device</label>
+                <select v-model="messageForm.device_id"
+                  class="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+                  <option value="">Default Instance</option>
+                  <option v-for="dev in devices" :key="dev.id" :value="dev.id">
+                    {{ dev.display_name || dev.id }} ({{ isDeviceOnline(dev) ? 'ONLINE' : 'OFFLINE' }})
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
+                  Recipients <span class="text-zinc-400 dark:text-zinc-500 font-normal">(comma or line separated, e.g.
+                    628123456789)</span>
+                </label>
+                <textarea v-model="messageForm.recipients" rows="3" placeholder="628123456789, 628987654321"
+                  class="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500"></textarea>
+              </div>
+
+              <div>
+                <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Message text</label>
+                <textarea v-model="messageForm.message" rows="4" placeholder="Type message..."
+                  class="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500"></textarea>
+              </div>
+
+              <div class="pt-2 flex items-center justify-between">
+                <div class="text-xs text-zinc-500 dark:text-zinc-400 font-mono">
+                  Recipients: <strong class="text-zinc-900 dark:text-white">{{ parseRecipientsList().length }}</strong>
+                </div>
+                <button @click="sendBroadcast"
+                  :disabled="sendingBroadcast || parseRecipientsList().length === 0 || !messageForm.message"
+                  class="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-zinc-950 font-semibold text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
+                  <span v-if="sendingBroadcast">Sending...</span>
+                  <span v-else>Send Broadcast</span>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div
+                class="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm space-y-3">
+                <h4 class="font-semibold text-xs text-zinc-900 dark:text-white uppercase tracking-wider">Broadcast
+                  Campaign Quota & Stats</h4>
+
+                <div
+                  class="p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 space-y-2 text-xs">
+                  <div class="flex justify-between items-center">
+                    <span class="text-zinc-500 dark:text-zinc-400">Broadcasts Sent:</span>
+                    <span class="font-mono font-bold text-zinc-900 dark:text-white">{{ currentUser.broadcast_count || 0
+                      }}</span>
+                  </div>
+                  <div class="flex justify-between items-center">
+                    <span class="text-zinc-500 dark:text-zinc-400">Campaign Allowance:</span>
+                    <span class="font-mono font-bold text-cyan-600 dark:text-cyan-400">
+                      {{ currentUser.broadcast_limit === -1 ? 'Unlimited' : (Number(currentUser.broadcast_limit ||
+                      5000).toLocaleString() + ' broadcasts') }}
+                    </span>
+                  </div>
+                  <div class="flex justify-between items-center">
+                    <span class="text-zinc-500 dark:text-zinc-400">Remaining Quota:</span>
+                    <span class="font-mono font-bold"
+                      :class="currentUser.broadcast_limit === -1 || (currentUser.broadcast_limit || 5000) > (currentUser.broadcast_count || 0) ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'">
+                      {{ currentUser.broadcast_limit === -1 ? 'Unlimited' : (Math.max(0, (currentUser.broadcast_limit ||
+                      5000) - (currentUser.broadcast_count || 0)) + ' broadcasts') }}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="w-full bg-zinc-200 dark:bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                  <div class="bg-cyan-500 h-1.5 rounded-full transition-all"
+                    :style="{ width: currentUser.broadcast_limit === -1 ? '10%' : Math.min(100, ((currentUser.broadcast_count || 0) / (currentUser.broadcast_limit || 5000)) * 100) + '%' }">
+                  </div>
+                </div>
+
+                <div v-if="currentUser.tier_id === 'ocean'"
+                  class="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                  Ocean Plan includes up to <strong>5,000 broadcasts</strong> per cycle. Upgrade to <strong>Sea
+                    Plan</strong> for unlimited campaigns.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- =================================================================== -->
+        <!-- TAB 4: CHATS & HISTORY (Full Split-Pane Chat & Message Viewer)      -->
+        <!-- =================================================================== -->
+        <div v-if="activeTab === 'chats'" class="space-y-4">
+          <!-- Top bar with Device Selector -->
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h2 class="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">Chats & Message History</h2>
+              <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Explore synchronized WhatsApp conversations and
+                chat history.</p>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <label class="text-xs font-medium text-zinc-500 dark:text-zinc-400 whitespace-nowrap">Device:</label>
+              <select v-model="selectedChatDeviceId" @change="onChatDeviceChange"
+                class="px-3 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-white font-mono focus:outline-none focus:border-cyan-500 shadow-sm">
+                <option v-for="dev in devices" :key="dev.id" :value="dev.id">
+                  {{ dev.id }} ({{ isDeviceOnline(dev) ? 'ONLINE' : 'OFFLINE' }})
+                </option>
+              </select>
+
+              <button @click="fetchChats"
+                class="p-1.5 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-lg border border-zinc-200 dark:border-zinc-800 transition-colors shadow-sm"
+                title="Refresh Chats">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Split-pane chat box -->
+          <div
+            class="grid grid-cols-1 md:grid-cols-12 bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm h-[600px]">
+
+            <!-- Left Pane: Conversation List -->
+            <div
+              class="md:col-span-5 border-r border-zinc-200 dark:border-zinc-800 flex flex-col h-full bg-zinc-50/50 dark:bg-zinc-900/40">
+              <!-- Search bar -->
+              <div class="p-3 border-b border-zinc-200 dark:border-zinc-800">
+                <input v-model="chatSearchQuery" type="text" placeholder="Search chats or numbers..."
+                  class="w-full px-3 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+              </div>
+
+              <!-- List items -->
+              <div class="flex-1 overflow-y-auto divide-y divide-zinc-200 dark:divide-zinc-800">
+                <div v-if="loadingChats" class="p-8 text-center text-xs text-zinc-400">
+                  Loading chats...
+                </div>
+                <div v-else-if="filteredChats.length === 0" class="p-8 text-center text-xs text-zinc-400">
+                  No chats synced yet for {{ selectedChatDeviceId || 'this device' }}.
+                </div>
+                <div v-for="chat in filteredChats" :key="chat.jid" @click="selectChat(chat)" :class="[
+                    'p-3 cursor-pointer transition-colors flex items-center gap-3',
+                    activeChat && activeChat.jid === chat.jid ? 'bg-cyan-500/10 border-l-2 border-cyan-500' : 'hover:bg-zinc-100 dark:hover:bg-zinc-900/80'
+                  ]">
+                  <!-- Avatar Icon -->
+                  <div
+                    class="w-9 h-9 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300 font-bold text-xs shrink-0">
+                    {{ (chat.name || chat.jid).charAt(0).toUpperCase() }}
+                  </div>
+
+                  <div class="overflow-hidden flex-1">
+                    <div class="flex items-center justify-between">
+                      <span class="font-semibold text-xs text-zinc-900 dark:text-white truncate max-w-[150px]">{{
+                        chat.name || chat.jid }}</span>
+                      <span class="text-[10px] text-zinc-400 font-mono">{{ formatDate(chat.last_message_time) }}</span>
+                    </div>
+                    <div class="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono truncate mt-0.5">
+                      {{ chat.jid }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Pane: Active Message Stream -->
+            <div class="md:col-span-7 flex flex-col h-full bg-white dark:bg-[#121215]">
+
+              <!-- Chat header -->
+              <div v-if="activeChat"
+                class="p-3.5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/50">
+                <div class="flex items-center gap-3">
+                  <div
+                    class="w-8 h-8 rounded-full bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 flex items-center justify-center font-bold text-xs">
+                    {{ (activeChat.name || activeChat.jid).charAt(0).toUpperCase() }}
+                  </div>
+                  <div>
+                    <div class="font-bold text-xs text-zinc-900 dark:text-white">{{ activeChat.name || activeChat.jid }}
+                    </div>
+                    <div class="text-[10px] text-zinc-500 font-mono">{{ activeChat.jid }}</div>
+                  </div>
+                </div>
+                <button @click="fetchMessages(activeChat.jid)"
+                  class="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-white rounded"
+                  title="Refresh messages">
+                  <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+
+              <!-- Message Stream -->
+              <div v-if="activeChat" class="flex-1 p-4 overflow-y-auto space-y-3 bg-zinc-50/30 dark:bg-[#0c0c0e]">
+                <div v-if="loadingMessages" class="p-8 text-center text-xs text-zinc-400">
+                  Loading message history...
+                </div>
+                <div v-else-if="chatMessages.length === 0" class="p-8 text-center text-xs text-zinc-400">
+                  No message history found for this chat.
+                </div>
+
+                <div v-for="msg in chatMessages" :key="msg.id"
+                  :class="['flex flex-col', msg.is_from_me ? 'items-end' : 'items-start']">
+
+                  <div :class="[
+                    'max-w-[75%] rounded-2xl px-3.5 py-2 text-xs shadow-sm space-y-1',
+                    msg.is_from_me ? 'bg-cyan-500 text-zinc-950 rounded-br-none' : 'bg-white dark:bg-zinc-800/90 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700/60 rounded-bl-none'
+                  ]">
+                    <!-- Sender Name for group incoming messages -->
+                    <div v-if="!msg.is_from_me && msg.sender_display_name"
+                      class="text-[10px] font-bold text-cyan-600 dark:text-cyan-400">
+                      {{ msg.sender_display_name }}
+                    </div>
+
+                    <!-- Media Tag if applicable -->
+                    <div
+                      v-if="msg.media_type && msg.media_type !== 'conversation' && msg.media_type !== 'extended_text'"
+                      class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] uppercase font-mono font-semibold"
+                      :class="msg.is_from_me ? 'bg-black/10 text-black' : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200'">
+                      📎 {{ msg.media_type }}
+                    </div>
+
+                    <!-- Message Body Content -->
+                    <div class="leading-relaxed whitespace-pre-wrap break-words">
+                      {{ msg.content || (msg.media_type ? '[' + msg.media_type + ' file]' : '') }}
+                    </div>
+
+                    <!-- Timestamp -->
+                    <div class="text-[9px] text-right font-mono"
+                      :class="msg.is_from_me ? 'text-black/60' : 'text-zinc-400'">
+                      {{ formatTime(msg.timestamp) }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Unselected placeholder -->
+              <div v-else class="flex-1 flex flex-col items-center justify-center p-8 text-center text-zinc-400">
+                <i data-lucide="message-square" class="w-10 h-10 mb-2 opacity-30"></i>
+                <div class="text-xs">Select a chat on the left to view message history.</div>
+              </div>
+
+              <!-- Quick Reply input box -->
+              <div v-if="activeChat"
+                class="p-3 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121215] flex items-center gap-2">
+                <input v-model="quickReplyText" @keyup.enter="sendQuickReply" type="text" placeholder="Type a reply..."
+                  class="flex-1 px-3.5 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+                <button @click="sendQuickReply" :disabled="!quickReplyText.trim() || sendingReply"
+                  class="p-2 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-zinc-950 rounded-lg transition-colors shadow-sm">
+                  <i data-lucide="send" class="w-4 h-4"></i>
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- =================================================================== -->
+        <!-- TAB 5: AUTO RESPONSE CHATBOT RULES (New Feature)                    -->
+        <!-- =================================================================== -->
+        <div v-if="activeTab === 'auto-response'" class="space-y-5">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 class="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">Auto Response Rules</h2>
+              <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Automated bot replies triggered by commands,
+                keywords, or patterns in WhatsApp chats.</p>
+            </div>
+            <button @click="openCreateAutoResponseModal = true"
+              class="px-3.5 py-2 bg-cyan-500 hover:bg-cyan-400 text-zinc-950 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 self-start shadow-sm">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+              <span>Add Response Rule</span>
+            </button>
+          </div>
+
+          <div
+            class="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm">
+            <div v-if="autoResponses.length === 0"
+              class="text-center py-12 text-zinc-500 dark:text-zinc-400 text-xs border-dashed">
+              <i data-lucide="bot" class="w-10 h-10 mx-auto mb-2 text-zinc-400 opacity-40"></i>
+              <div>No auto response rules configured yet.</div>
+              <p class="text-[11px] text-zinc-400 mt-1">Create automated triggers like <strong>!menu</strong>,
+                <strong>halo</strong>, or custom keywords.</p>
+            </div>
+
+            <div v-else class="divide-y divide-zinc-200 dark:divide-zinc-800">
+              <div v-for="rule in autoResponses" :key="rule.id"
+                class="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-zinc-50 dark:hover:bg-zinc-900/60 transition-colors">
+                <div class="space-y-1.5 flex-1 overflow-hidden">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span
+                      class="font-bold text-sm text-zinc-900 dark:text-white font-mono bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded border border-zinc-200 dark:border-zinc-700">
+                      {{ rule.trigger_keyword }}
+                    </span>
+                    <span
+                      class="text-[10px] font-mono uppercase px-2 py-0.5 rounded font-semibold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+                      {{ rule.trigger_type }}
+                    </span>
+                    <span v-if="rule.device_id"
+                      class="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
+                      Device: {{ rule.device_id }}
+                    </span>
+                    <span v-else
+                      class="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500">
+                      All Devices
+                    </span>
+                  </div>
+
+                  <p
+                    class="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed font-sans bg-zinc-50 dark:bg-zinc-900/90 p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800/80 whitespace-pre-wrap break-words">
+                    {{ rule.response_message }}
+                  </p>
+                </div>
+
+                <div class="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                  <!-- Active Toggle button -->
+                  <button @click="toggleAutoResponseActive(rule)" :class="[
+                      'px-2.5 py-1 rounded text-xs font-mono font-medium transition-colors border',
+                      rule.is_active ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/30' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 border-zinc-200 dark:border-zinc-700'
+                    ]">
+                    {{ rule.is_active ? 'ENABLED' : 'DISABLED' }}
+                  </button>
+
+                  <button @click="openEditAutoResponseModalFor(rule)"
+                    class="p-1.5 text-zinc-500 hover:text-cyan-500 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    title="Edit Rule">
+                    <i data-lucide="edit-2" class="w-4 h-4"></i>
+                  </button>
+
+                  <button @click="deleteAutoResponse(rule.id)"
+                    class="p-1.5 text-zinc-400 hover:text-red-500 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    title="Delete Rule">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- =================================================================== -->
+        <!-- TAB 6: DEVELOPER (API KEYS & WEBHOOKS)                              -->
+        <!-- =================================================================== -->
+        <div v-if="activeTab === 'developer'" class="space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 class="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">Developer API & Webhooks</h2>
+              <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">REST API authentication keys and outbound
+                webhook triggers.</p>
+            </div>
+            <a href="/swags" target="_blank"
+              class="px-3.5 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-cyan-600 dark:text-cyan-400 text-xs font-semibold rounded-lg transition-colors border border-zinc-200 dark:border-zinc-700 flex items-center gap-1.5 self-start shadow-sm">
+              <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+              <span>Open Swagger Docs</span>
+            </a>
+          </div>
+
+          <!-- API Keys -->
+          <div class="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-sm font-semibold text-zinc-900 dark:text-white">API Keys</h3>
+                <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Send header: <code
+                    class="font-mono text-cyan-600 dark:text-cyan-400">X-API-Key: &lt;your_key&gt;</code></p>
+              </div>
+              <button @click="openCreateKeyModal = true"
+                :disabled="apiKeys.length >= (currentUser.api_key_limit || 1) && currentUser.role !== 'admin'"
+                class="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-zinc-950 font-semibold text-xs rounded-lg transition-colors shadow-sm">
+                + Create Key
+              </button>
+            </div>
+
+            <div v-if="apiKeys.length === 0"
+              class="text-center py-6 text-zinc-400 dark:text-zinc-500 text-xs border border-dashed border-zinc-200 dark:border-zinc-800 rounded-lg">
+              No API keys generated.
+            </div>
+
+            <div v-else class="space-y-2">
+              <div v-for="k in apiKeys" :key="k.id"
+                class="p-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg flex items-center justify-between shadow-sm">
+                <div>
+                  <div class="font-medium text-xs text-zinc-900 dark:text-white">{{ k.name }}</div>
+                  <div class="font-mono text-xs text-cyan-600 dark:text-cyan-400 mt-0.5 select-all">{{ k.key_value }}
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button @click="copyToClipboard(k.key_value)"
+                    class="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-white rounded hover:bg-zinc-200 dark:hover:bg-zinc-800"
+                    title="Copy">
+                    <i data-lucide="copy" class="w-4 h-4"></i>
+                  </button>
+                  <button @click="deleteApiKey(k.id)"
+                    class="p-1.5 text-zinc-400 hover:text-red-500 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800"
+                    title="Delete">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Webhooks -->
+          <div class="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-sm font-semibold text-zinc-900 dark:text-white">Outbound Webhooks</h3>
+                <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Receive HTTP POST notifications on WhatsApp
+                  events.</p>
+              </div>
+              <button @click="openCreateWebhookModal = true"
+                :disabled="webhooks.length >= (currentUser.webhook_limit || 1) && currentUser.role !== 'admin'"
+                class="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-50 text-zinc-800 dark:text-zinc-200 font-semibold text-xs rounded-lg transition-colors border border-zinc-200 dark:border-zinc-700 shadow-sm">
+                + Add Webhook
+              </button>
+            </div>
+
+            <div v-if="webhooks.length === 0"
+              class="text-center py-6 text-zinc-400 dark:text-zinc-500 text-xs border border-dashed border-zinc-200 dark:border-zinc-800 rounded-lg">
+              No webhooks configured.
+            </div>
+
+            <div v-else class="space-y-2">
+              <div v-for="w in webhooks" :key="w.id"
+                class="p-3 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg flex items-center justify-between shadow-sm">
+                <div>
+                  <div class="font-mono text-xs text-zinc-800 dark:text-zinc-200 break-all">{{ w.url }}</div>
+                  <div class="text-[10px] text-zinc-500 mt-0.5">Events: {{ w.events || 'all' }}</div>
+                </div>
+                <button @click="deleteWebhook(w.id)"
+                  class="p-1.5 text-zinc-400 hover:text-red-500 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800"
+                  title="Delete">
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- =================================================================== -->
+        <!-- TAB 7: ADMIN USER MANAGEMENT (Admin Only)                           -->
+        <!-- =================================================================== -->
+        <div v-if="activeTab === 'admin-users' && currentUser.role === 'admin'" class="space-y-5">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 class="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">User Administration</h2>
+              <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Manage tenants, subscription plans, and
+                validity extensions.</p>
+            </div>
+            <button @click="openAdminCreateUserModal = true"
+              class="px-3.5 py-2 bg-cyan-500 hover:bg-cyan-400 text-zinc-950 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+              <span>Create User</span>
+            </button>
+          </div>
+
+          <div
+            class="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-sm">
+            <div class="p-3.5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+              <input v-model="userSearchQuery" type="text" placeholder="Search user..."
+                class="px-3 py-1.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs w-64 text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+              <span class="text-xs text-zinc-500 dark:text-zinc-400 font-mono">Count: {{ filteredAdminUsers.length
+                }}</span>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead
+                  class="bg-zinc-50 dark:bg-zinc-900/80 text-zinc-500 dark:text-zinc-400 uppercase tracking-wider font-semibold border-b border-zinc-200 dark:border-zinc-800">
+                  <tr>
+                    <th class="py-3 px-4">User</th>
+                    <th class="py-3 px-4">Role</th>
+                    <th class="py-3 px-4">Tier</th>
+                    <th class="py-3 px-4">Expires</th>
+                    <th class="py-3 px-4">Usage</th>
+                    <th class="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-200 dark:divide-zinc-800 text-zinc-800 dark:text-zinc-200">
+                  <tr v-for="u in filteredAdminUsers" :key="u.id"
+                    class="hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors">
+                    <td class="py-3 px-4">
+                      <div class="font-medium text-zinc-900 dark:text-white">{{ u.full_name }}</div>
+                      <div class="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono">{{ u.email }}</div>
+                    </td>
+                    <td class="py-3 px-4">
+                      <span :class="[
+                        'px-2 py-0.5 rounded font-mono text-[10px] font-medium',
+                        u.role === 'admin' ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300'
+                      ]">
+                        {{ u.role }}
+                      </span>
+                    </td>
+                    <td class="py-3 px-4">
+                      <span
+                        class="px-2 py-0.5 rounded font-mono text-[10px] uppercase font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                        {{ u.tier_name || 'None' }}
+                      </span>
+                    </td>
+                    <td class="py-3 px-4 font-mono">
+                      <div v-if="u.role === 'admin'" class="text-cyan-600 dark:text-cyan-400 font-medium">Lifetime</div>
+                      <div v-else-if="u.has_active_tier">
+                        {{ formatDate(u.tier_expires_at) }}
+                        <span class="text-zinc-400 dark:text-zinc-500 text-[10px]">({{ u.days_remaining }}d)</span>
+                      </div>
+                      <div v-else class="text-amber-600 dark:text-amber-400 font-medium">Expired</div>
+                    </td>
+                    <td class="py-3 px-4 font-mono text-zinc-500 dark:text-zinc-400">
+                      {{ u.device_count || 0 }} dev · {{ u.message_count || 0 }} msg · {{ u.broadcast_count || 0 }}
+                      bcast
+                    </td>
+                    <td class="py-3 px-4 text-right space-x-1.5">
+                      <button @click="openRenewModalForUser(u)"
+                        class="px-2 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-600 dark:text-cyan-300 font-medium rounded transition-colors"
+                        title="Renew">
+                        Renew
+                      </button>
+                      <button @click="openChangePlanModalForUser(u)"
+                        class="px-2 py-1 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 rounded transition-colors">
+                        Tier
+                      </button>
+                      <button v-if="u.id !== currentUser.id" @click="adminDeleteUser(u.id)"
+                        class="px-2 py-1 text-zinc-400 hover:text-red-500 rounded transition-colors" title="Delete">
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- =================================================================== -->
+        <!-- TAB 8: ADMIN PLAN MANAGEMENT (Admin Only)                           -->
+        <!-- =================================================================== -->
+        <div v-if="activeTab === 'admin-plans' && currentUser.role === 'admin'" class="space-y-5">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 class="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">Subscription Plans & Quota
+                Limits</h2>
+              <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Define custom pricing, device slot caps, and
+                broadcast quotas for customer plans.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button @click="adminResetAllQuotas"
+                class="px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 text-xs font-semibold rounded-lg transition-colors border border-amber-500/20 flex items-center gap-1.5 shadow-sm"
+                title="Manually reset all user sending & broadcast limits">
+                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                <span>Reset All Quotas</span>
+              </button>
+              <button @click="openCreatePlanModal = true"
+                class="px-3.5 py-2 bg-cyan-500 hover:bg-cyan-400 text-zinc-950 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                <span>Add Plan</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Automated Reset Cycles Banner -->
+          <div
+            class="p-3.5 bg-cyan-500/5 dark:bg-cyan-500/10 border border-cyan-500/20 rounded-xl flex items-center justify-between text-xs text-zinc-600 dark:text-zinc-300">
+            <div class="flex items-center gap-2.5">
+              <i data-lucide="calendar" class="w-4 h-4 text-cyan-500 shrink-0"></i>
+              <div>
+                <strong>Automated Reset Cycles:</strong> Direct message limits reset <strong>daily at 00:00</strong> ·
+                Broadcast campaign quotas reset on the <strong>1st of every month</strong>.
+              </div>
+            </div>
+            <span
+              class="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 font-semibold shrink-0">Auto-Active</span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div v-for="plan in availablePlans" :key="plan.id"
+              class="bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 flex flex-col justify-between shadow-sm">
+              <div>
+                <div class="flex items-start justify-between">
+                  <div>
+                    <h3 class="font-bold text-base text-zinc-900 dark:text-white">{{ plan.name }}</h3>
+                    <span class="text-xs font-mono text-cyan-600 dark:text-cyan-400 uppercase font-semibold">{{ plan.id
+                      }}</span>
+                  </div>
+                  <span class="text-xs font-mono font-bold text-zinc-900 dark:text-white">
+                    Rp {{ plan.price_monthly ? Number(plan.price_monthly).toLocaleString('id-ID') : 0 }}
+                    <span class="text-[10px] text-zinc-400 font-sans font-normal">/ {{ plan.duration_days }}d</span>
+                  </span>
+                </div>
+
+                <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-2 mb-4 leading-relaxed">
+                  {{ plan.description || 'No description set for this tier.' }}
+                </p>
+
+                <div
+                  class="p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 space-y-2 text-xs">
+                  <div class="flex justify-between items-center">
+                    <span class="text-zinc-500 dark:text-zinc-400">Device Cap:</span>
+                    <span class="font-mono font-semibold text-zinc-900 dark:text-white">{{ plan.device_limit }}
+                      devices</span>
+                  </div>
+                  <div class="flex justify-between items-center">
+                    <span class="text-zinc-500 dark:text-zinc-400">Direct Send Limit:</span>
+                    <span class="font-mono font-semibold text-cyan-600 dark:text-cyan-400">
+                      {{ plan.message_limit === -1 ? 'Unlimited' : ((plan.message_limit || 100) + ' msgs/day') }}
+                    </span>
+                  </div>
+                  <div class="flex justify-between items-center">
+                    <span class="text-zinc-500 dark:text-zinc-400">Broadcast Quota:</span>
+                    <span class="font-mono font-semibold text-cyan-600 dark:text-cyan-400">
+                      {{ plan.broadcast_limit === -1 ? 'Unlimited' : (Number(plan.broadcast_limit ||
+                      5000).toLocaleString() + ' /month') }}
+                    </span>
+                  </div>
+                  <div class="flex justify-between items-center">
+                    <span class="text-zinc-500 dark:text-zinc-400">API Keys:</span>
+                    <span class="font-mono text-zinc-800 dark:text-zinc-200">{{ plan.api_key_limit }} keys</span>
+                  </div>
+                  <div class="flex justify-between items-center">
+                    <span class="text-zinc-500 dark:text-zinc-400">Webhooks:</span>
+                    <span class="font-mono text-zinc-800 dark:text-zinc-200">{{ plan.webhook_limit }} webhooks</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-4 pt-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-end gap-2">
+                <button @click="openEditPlanModalFor(plan)"
+                  class="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-xs font-semibold rounded-lg transition-colors">
+                  Edit Config
+                </button>
+                <button @click="adminDeletePlan(plan.id)"
+                  class="p-1.5 text-zinc-400 hover:text-red-500 rounded transition-colors" title="Delete Plan">
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- MODALS                                                                    -->
+    <!-- ========================================================================= -->
+
+    <!-- CREATE AUTO RESPONSE MODAL -->
+    <div v-if="openCreateAutoResponseModal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm overflow-y-auto">
+      <div
+        class="w-full max-w-lg bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 sm:p-7 relative shadow-2xl my-8">
+        <button @click="openCreateAutoResponseModal = false"
+          class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white text-xl leading-none">&times;</button>
+        <h3 class="text-base font-bold text-zinc-900 dark:text-white mb-1">Add Auto Response Rule</h3>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-4">Set up an automated reply when a keyword or command is
+          received.</p>
+
+        <form @submit.prevent="createAutoResponseRule" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Trigger Keyword /
+                Command</label>
+              <input v-model="autoResponseForm.trigger_keyword" type="text" required
+                placeholder="e.g. !menu, halo, price"
+                class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Match Type</label>
+              <select v-model="autoResponseForm.trigger_type"
+                class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+                <option value="contains">Contains Keyword</option>
+                <option value="exact">Exact Match</option>
+                <option value="starts_with">Starts With (Command)</option>
+                <option value="regex">Regular Expression</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Target WhatsApp
+              Device</label>
+            <select v-model="autoResponseForm.device_id"
+              class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+              <option value="">All Devices (Global)</option>
+              <option v-for="dev in devices" :key="dev.id" :value="dev.id">
+                {{ dev.id }} ({{ dev.jid || 'Unpaired' }})
+              </option>
+            </select>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300">Auto Reply Message
+                Template</label>
+              <div class="text-[10px] text-zinc-400 space-x-1">
+                <span>Variables:</span>
+                <button type="button" @click="autoResponseForm.response_message += ' {name}'"
+                  class="text-cyan-500 hover:underline font-mono">{name}</button>
+                <button type="button" @click="autoResponseForm.response_message += ' {sender}'"
+                  class="text-cyan-500 hover:underline font-mono">{sender}</button>
+                <button type="button" @click="autoResponseForm.response_message += ' {time}'"
+                  class="text-cyan-500 hover:underline font-mono">{time}</button>
+              </div>
+            </div>
+            <textarea v-model="autoResponseForm.response_message" rows="4" required
+              placeholder="Halo {name}! Terima kasih sudah menghubungi kami. Berikut daftar menu:&#10;1. Cek Harga&#10;2. CS Support"
+              class="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500"></textarea>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <input v-model="autoResponseForm.is_active" type="checkbox" id="ar_active"
+              class="w-4 h-4 rounded border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-cyan-500 focus:ring-cyan-500/20">
+            <label for="ar_active" class="text-xs text-zinc-700 dark:text-zinc-300">Enable this rule immediately</label>
+          </div>
+
+          <button type="submit"
+            class="w-full py-2.5 bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-semibold text-xs rounded-lg transition-colors shadow-sm">
+            Save Auto Response Rule
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- EDIT AUTO RESPONSE MODAL -->
+    <div v-if="editAutoResponseModal.show"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm overflow-y-auto">
+      <div
+        class="w-full max-w-lg bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 sm:p-7 relative shadow-2xl my-8">
+        <button @click="editAutoResponseModal.show = false"
+          class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white text-xl leading-none">&times;</button>
+        <h3 class="text-base font-bold text-zinc-900 dark:text-white mb-1">Edit Auto Response Rule</h3>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-4">Modify trigger or reply message.</p>
+
+        <form @submit.prevent="updateAutoResponseRule" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Trigger Keyword /
+                Command</label>
+              <input v-model="editAutoResponseModal.form.trigger_keyword" type="text" required
+                class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Match Type</label>
+              <select v-model="editAutoResponseModal.form.trigger_type"
+                class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+                <option value="contains">Contains Keyword</option>
+                <option value="exact">Exact Match</option>
+                <option value="starts_with">Starts With (Command)</option>
+                <option value="regex">Regular Expression</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Target WhatsApp
+              Device</label>
+            <select v-model="editAutoResponseModal.form.device_id"
+              class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+              <option value="">All Devices (Global)</option>
+              <option v-for="dev in devices" :key="dev.id" :value="dev.id">
+                {{ dev.id }} ({{ dev.jid || 'Unpaired' }})
+              </option>
+            </select>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300">Auto Reply Message
+                Template</label>
+              <div class="text-[10px] text-zinc-400 space-x-1">
+                <span>Variables:</span>
+                <button type="button" @click="editAutoResponseModal.form.response_message += ' {name}'"
+                  class="text-cyan-500 hover:underline font-mono">{name}</button>
+                <button type="button" @click="editAutoResponseModal.form.response_message += ' {sender}'"
+                  class="text-cyan-500 hover:underline font-mono">{sender}</button>
+                <button type="button" @click="editAutoResponseModal.form.response_message += ' {time}'"
+                  class="text-cyan-500 hover:underline font-mono">{time}</button>
+              </div>
+            </div>
+            <textarea v-model="editAutoResponseModal.form.response_message" rows="4" required
+              class="w-full px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500"></textarea>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <input v-model="editAutoResponseModal.form.is_active" type="checkbox" id="ar_edit_active"
+              class="w-4 h-4 rounded border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-cyan-500 focus:ring-cyan-500/20">
+            <label for="ar_edit_active" class="text-xs text-zinc-700 dark:text-zinc-300">Active Rule</label>
+          </div>
+
+          <button type="submit"
+            class="w-full py-2.5 bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-semibold text-xs rounded-lg transition-colors shadow-sm">
+            Update Rule
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- DYNAMIC USER SELECT PLAN MODAL -->
+    <div v-if="openPlanModal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm overflow-y-auto">
+      <div
+        class="w-full max-w-2xl bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 relative shadow-2xl my-8">
+        <button @click="openPlanModal = false"
+          class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white text-xl leading-none">&times;</button>
+
+        <h3 class="text-lg font-bold text-zinc-900 dark:text-white mb-1">Select Subscription Tier</h3>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-6">Choose an automation package tailored to your messaging
+          volume.</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div v-for="plan in availablePlans" :key="plan.id"
+            class="border rounded-xl p-5 flex flex-col justify-between transition-all"
+            :class="currentUser.tier_id === plan.id ? 'bg-zinc-50 dark:bg-zinc-900 border-cyan-500 shadow-sm' : 'bg-zinc-50/60 dark:bg-zinc-900/60 border-zinc-200 dark:border-zinc-800'">
+            <div>
+              <div class="flex justify-between items-center">
+                <h4 class="text-base font-bold text-zinc-900 dark:text-white">{{ plan.name }}</h4>
+                <span
+                  class="text-[10px] font-mono uppercase bg-zinc-200 dark:bg-zinc-800 px-2 py-0.5 rounded text-zinc-700 dark:text-zinc-300 font-semibold">{{
+                  plan.id }}</span>
+              </div>
+
+              <div class="my-4 text-2xl font-bold font-mono text-zinc-900 dark:text-white">
+                Rp {{ Number(plan.price_monthly || 0).toLocaleString('id-ID') }}
+                <span class="text-xs text-zinc-400 dark:text-zinc-500 font-sans font-normal">/ {{ plan.duration_days
+                  }}d</span>
+              </div>
+
+              <ul class="space-y-2.5 text-xs text-zinc-600 dark:text-zinc-300">
+                <li class="flex items-center gap-2">
+                  <i data-lucide="check" class="w-3.5 h-3.5 text-cyan-500 shrink-0"></i>
+                  <span><strong>{{ plan.device_limit }} Devices</strong> (Slots)</span>
+                </li>
+                <li class="flex items-center gap-2">
+                  <i data-lucide="check" class="w-3.5 h-3.5 text-cyan-500 shrink-0"></i>
+                  <span><strong>{{ plan.message_limit === -1 ? 'Unlimited' : ((plan.message_limit || 100) + ' msgs/day')
+                      }}</strong> Direct Send (Daily Reset)</span>
+                </li>
+                <li class="flex items-center gap-2">
+                  <i data-lucide="check" class="w-3.5 h-3.5 text-cyan-500 shrink-0"></i>
+                  <span><strong>{{ plan.broadcast_limit === -1 ? 'Unlimited' : (Number(plan.broadcast_limit ||
+                      5000).toLocaleString() + ' broadcasts/mo') }}</strong> Campaign Quota (Monthly Reset)</span>
+                </li>
+                <li class="flex items-center gap-2">
+                  <i data-lucide="check" class="w-3.5 h-3.5 text-cyan-500 shrink-0"></i>
+                  <span><strong>{{ plan.api_key_limit }} API Keys</strong></span>
+                </li>
+                <li class="flex items-center gap-2">
+                  <i data-lucide="check" class="w-3.5 h-3.5 text-cyan-500 shrink-0"></i>
+                  <span><strong>{{ plan.webhook_limit }} Webhooks</strong></span>
+                </li>
+              </ul>
+            </div>
+
+            <button @click="selectPlan(plan.id)"
+              class="w-full mt-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-semibold text-xs rounded-lg transition-colors shadow-sm">
+              {{ currentUser.tier_id === plan.id ? 'Re-activate ' + plan.name : 'Select ' + plan.name }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADMIN CREATE PLAN MODAL -->
+    <div v-if="openCreatePlanModal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm overflow-y-auto">
+      <div
+        class="w-full max-w-md bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 relative shadow-2xl my-8">
+        <button @click="openCreatePlanModal = false"
+          class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white text-xl leading-none">&times;</button>
+        <h3 class="text-base font-bold text-zinc-900 dark:text-white mb-1">Create Subscription Plan</h3>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-4">Define plan quotas and device limits.</p>
+
+        <form @submit.prevent="adminCreatePlan" class="space-y-3">
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Plan ID (Slug)</label>
+              <input v-model="planForm.id" type="text" required placeholder="e.g. enterprise"
+                class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Plan Name</label>
+              <input v-model="planForm.name" type="text" required placeholder="e.g. Enterprise Tier"
+                class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2.5">
+            <div>
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Device Cap</label>
+              <input v-model.number="planForm.device_limit" type="number" min="1" required
+                class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                Daily Direct <span class="text-[10px] text-zinc-400">(-1=unlim)</span>
+              </label>
+              <input v-model.number="planForm.message_limit" type="number" required
+                class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                Monthly Bcast <span class="text-[10px] text-zinc-400">(-1=unlim)</span>
+              </label>
+              <input v-model.number="planForm.broadcast_limit" type="number" required
+                class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">API Key Limit</label>
+              <input v-model.number="planForm.api_key_limit" type="number" min="0" required
+                class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Webhook Limit</label>
+              <input v-model.number="planForm.webhook_limit" type="number" min="0" required
+                class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Duration (Days)</label>
+              <input v-model.number="planForm.duration_days" type="number" min="1" required
+                class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Monthly Price (Rp)</label>
+              <input v-model.number="planForm.price_monthly" type="number" min="0" required
+                class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Description</label>
+            <textarea v-model="planForm.description" rows="2" placeholder="Description of features..."
+              class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500"></textarea>
+          </div>
+
+          <button type="submit"
+            class="w-full mt-2 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-semibold text-xs rounded-lg transition-colors shadow-sm">
+            Save Plan
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- ADMIN EDIT PLAN MODAL -->
+    <div v-if="editPlanModal.show"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm overflow-y-auto">
+      <div
+        class="w-full max-w-md bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 relative shadow-2xl my-8">
+        <button @click="editPlanModal.show = false"
+          class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white text-xl leading-none">&times;</button>
+        <h3 class="text-base font-bold text-zinc-900 dark:text-white mb-1">Edit Plan: {{ editPlanModal.form.id }}</h3>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-4">Adjust quotas, device cap, and pricing.</p>
+
+        <form @submit.prevent="adminUpdatePlan" class="space-y-3">
+          <div>
+            <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Plan Name</label>
+            <input v-model="editPlanModal.form.name" type="text" required
+              class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+          </div>
+
+          <div class="grid grid-cols-3 gap-2.5">
+            <div>
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Device Cap</label>
+              <input v-model.number="editPlanModal.form.device_limit" type="number" min="1" required
+                class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                Daily Direct <span class="text-[10px] text-zinc-400">(-1=unlim)</span>
+              </label>
+              <input v-model.number="editPlanModal.form.message_limit" type="number" required
+                class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                Monthly Bcast <span class="text-[10px] text-zinc-400">(-1=unlim)</span>
+              </label>
+              <input v-model.number="editPlanModal.form.broadcast_limit" type="number" required
+                class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">API Key Limit</label>
+              <input v-model.number="editPlanModal.form.api_key_limit" type="number" min="0" required
+                class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Webhook Limit</label>
+              <input v-model.number="editPlanModal.form.webhook_limit" type="number" min="0" required
+                class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Duration (Days)</label>
+              <input v-model.number="editPlanModal.form.duration_days" type="number" min="1" required
+                class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Monthly Price (Rp)</label>
+              <input v-model.number="editPlanModal.form.price_monthly" type="number" min="0" required
+                class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Description</label>
+            <textarea v-model="editPlanModal.form.description" rows="2"
+              class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500"></textarea>
+          </div>
+
+          <button type="submit"
+            class="w-full mt-2 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-semibold text-xs rounded-lg transition-colors shadow-sm">
+            Update Plan Configuration
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- ADD DEVICE MODAL -->
+    <div v-if="openAddDeviceModal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
+      <div
+        class="w-full max-w-sm bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 relative shadow-2xl">
+        <button @click="openAddDeviceModal = false"
+          class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white text-xl leading-none">&times;</button>
+        <h3 class="text-base font-bold text-zinc-900 dark:text-white mb-1">Add Device Slot</h3>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-4">Set a custom identifier for this instance.</p>
+
+        <form @submit.prevent="createDeviceSlot" class="space-y-3.5">
+          <div>
+            <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">Device ID</label>
+            <input v-model="newDeviceForm.device_id" type="text" placeholder="e.g. cs-1, sales-wa"
+              class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+          </div>
+
+          <div class="text-[11px] text-zinc-500 font-mono">
+            Available slots: {{ (currentUser.device_limit || 2) - devices.length }}
+          </div>
+
+          <button type="submit"
+            class="w-full py-2.5 bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-semibold text-xs rounded-lg transition-colors shadow-sm">
+            Create Instance
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- QR MODAL -->
+    <div v-if="qrModal.show"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
+      <div
+        class="w-full max-w-sm bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 text-center relative shadow-2xl">
+        <button @click="closeQRModal"
+          class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white text-xl leading-none">&times;</button>
+        <h3 class="text-base font-bold text-zinc-900 dark:text-white mb-0.5">Scan QR Code</h3>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-5">Open WhatsApp &gt; Linked Devices &gt; Link a Device
+        </p>
+
+        <div
+          class="flex items-center justify-center p-3 bg-white rounded-xl w-56 h-56 mx-auto shadow-md border border-zinc-100">
+          <img v-if="qrModal.qrImage" :src="qrModal.qrImage" alt="QR" class="w-full h-full object-contain">
+          <div v-else class="text-zinc-400 text-xs">Loading QR...</div>
+        </div>
+
+        <div class="mt-5 flex items-center justify-center gap-2">
+          <button @click="refreshQR"
+            class="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-xs font-medium rounded-lg transition-colors">
+            Refresh
+          </button>
+          <button @click="closeQRModal"
+            class="px-4 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-zinc-950 text-xs font-semibold rounded-lg transition-colors shadow-sm">
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CODE MODAL -->
+    <div v-if="codeModal.show"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
+      <div
+        class="w-full max-w-sm bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 relative shadow-2xl">
+        <button @click="codeModal.show = false"
+          class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white text-xl leading-none">&times;</button>
+        <h3 class="text-base font-bold text-zinc-900 dark:text-white mb-1">Pairing Code</h3>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-4">Enter phone number with country code.</p>
+
+        <form @submit.prevent="generatePairingCode" class="space-y-3.5">
+          <div>
+            <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Phone Number</label>
+            <input v-model="codeModal.phone" type="text" required placeholder="e.g. 628123456789"
+              class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+          </div>
+
+          <div v-if="codeModal.code"
+            class="p-3 bg-zinc-50 dark:bg-zinc-900 border border-cyan-500/40 rounded-lg text-center">
+            <div class="text-xs text-zinc-500 dark:text-zinc-400">Code:</div>
+            <div class="text-2xl font-mono font-bold text-cyan-600 dark:text-cyan-400 tracking-widest my-1 select-all">
+              {{ codeModal.code }}</div>
+          </div>
+
+          <button type="submit" :disabled="codeModal.loading"
+            class="w-full py-2.5 bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-semibold text-xs rounded-lg transition-colors shadow-sm">
+            {{ codeModal.loading ? 'Generating...' : 'Get Pairing Code' }}
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- API KEY MODAL -->
+    <div v-if="openCreateKeyModal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
+      <div
+        class="w-full max-w-sm bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 relative shadow-2xl">
+        <button @click="openCreateKeyModal = false"
+          class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white text-xl leading-none">&times;</button>
+        <h3 class="text-base font-bold text-zinc-900 dark:text-white mb-1">Generate API Key</h3>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-4">Label this key to identify its consumer.</p>
+
+        <form @submit.prevent="generateApiKey" class="space-y-3.5">
+          <div>
+            <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Key Label</label>
+            <input v-model="newKeyName" type="text" required placeholder="e.g. Backend Production"
+              class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+          </div>
+          <button type="submit"
+            class="w-full py-2.5 bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-semibold text-xs rounded-lg transition-colors shadow-sm">
+            Generate
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- WEBHOOK MODAL -->
+    <div v-if="openCreateWebhookModal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
+      <div
+        class="w-full max-w-sm bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 relative shadow-2xl">
+        <button @click="openCreateWebhookModal = false"
+          class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white text-xl leading-none">&times;</button>
+        <h3 class="text-base font-bold text-zinc-900 dark:text-white mb-1">Add Webhook</h3>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-4">Endpoint where incoming events will be sent.</p>
+
+        <form @submit.prevent="createWebhookEndpoint" class="space-y-3.5">
+          <div>
+            <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Webhook URL</label>
+            <input v-model="newWebhookForm.url" type="url" required placeholder="https://api.yourdomain.com/webhook"
+              class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Secret (Optional)</label>
+            <input v-model="newWebhookForm.secret" type="text" placeholder="secret-token"
+              class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs font-mono text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+          </div>
+          <button type="submit"
+            class="w-full py-2.5 bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-semibold text-xs rounded-lg transition-colors shadow-sm">
+            Save Webhook
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- ADMIN CREATE USER MODAL -->
+    <div v-if="openAdminCreateUserModal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
+      <div
+        class="w-full max-w-sm bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 relative shadow-2xl">
+        <button @click="openAdminCreateUserModal = false"
+          class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white text-xl leading-none">&times;</button>
+        <h3 class="text-base font-bold text-zinc-900 dark:text-white mb-1">Create User</h3>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-4">Provision a new account.</p>
+
+        <form @submit.prevent="adminCreateUser" class="space-y-3">
+          <div>
+            <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Full Name</label>
+            <input v-model="adminUserForm.full_name" type="text" required
+              class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Email</label>
+            <input v-model="adminUserForm.email" type="email" required
+              class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Password</label>
+            <input v-model="adminUserForm.password" type="password" required minlength="6"
+              class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+          </div>
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Role</label>
+              <select v-model="adminUserForm.role"
+                class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+                <option value="pelanggan">Pelanggan</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">Tier</label>
+              <select v-model="adminUserForm.tier_id"
+                class="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-800 rounded-lg text-xs text-zinc-900 dark:text-white focus:outline-none focus:border-cyan-500">
+                <option value="">No Tier</option>
+                <option v-for="p in availablePlans" :key="p.id" :value="p.id">
+                  {{ p.name }} ({{ p.device_limit }} Dev)
+                </option>
+              </select>
+            </div>
+          </div>
+          <button type="submit"
+            class="w-full mt-2 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-semibold text-xs rounded-lg transition-colors shadow-sm">
+            Create User
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- ADMIN RENEW MODAL -->
+    <div v-if="renewModal.show"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 dark:bg-black/80 backdrop-blur-sm">
+      <div
+        class="w-full max-w-xs bg-white dark:bg-[#121215] border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 text-center relative shadow-2xl">
+        <button @click="renewModal.show = false"
+          class="absolute top-4 right-4 text-zinc-400 hover:text-zinc-700 dark:hover:text-white text-xl leading-none">&times;</button>
+        <h3 class="text-sm font-bold text-zinc-900 dark:text-white mb-1">Renew Subscription</h3>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-4">Extend validity for <strong
+            class="text-zinc-800 dark:text-zinc-200">{{ renewModal.userName }}</strong></p>
+
+        <div class="grid grid-cols-3 gap-2">
+          <button @click="adminRenew(30)"
+            class="py-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 hover:bg-cyan-500/10 hover:border-cyan-500 border border-zinc-200 dark:border-zinc-800 text-xs font-medium text-zinc-800 dark:text-white transition-colors font-mono">
+            +30d
+          </button>
+          <button @click="adminRenew(90)"
+            class="py-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 hover:bg-cyan-500/10 hover:border-cyan-500 border border-zinc-200 dark:border-zinc-800 text-xs font-medium text-zinc-800 dark:text-white transition-colors font-mono">
+            +90d
+          </button>
+          <button @click="adminRenew(365)"
+            class="py-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-900 hover:bg-cyan-500/10 hover:border-cyan-500 border border-zinc-200 dark:border-zinc-800 text-xs font-medium text-zinc-800 dark:text-white transition-colors font-mono">
+            +1y
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const { createApp, ref, computed, onMounted, nextTick } = Vue;
+
+    createApp({
+      setup() {
+        const isDark = ref(true);
+        const mobileSidebarOpen = ref(false);
+        const isAuthenticated = ref(false);
+        const authLoading = ref(false);
+        const activeTab = ref('overview');
+        const currentUser = ref({});
+        const devices = ref([]);
+        const chats = ref([]);
+        const activeChat = ref(null);
+        const chatMessages = ref([]);
+        const selectedChatDeviceId = ref('');
+        const chatSearchQuery = ref('');
+        const quickReplyText = ref('');
+        const loadingChats = ref(false);
+        const loadingMessages = ref(false);
+        const sendingReply = ref(false);
+
+        const autoResponses = ref([]);
+        const openCreateAutoResponseModal = ref(false);
+        const autoResponseForm = ref({
+          device_id: '',
+          trigger_type: 'contains',
+          trigger_keyword: '',
+          response_message: '',
+          is_active: true
+        });
+        const editAutoResponseModal = ref({
+          show: false,
+          form: {
+            id: 0,
+            device_id: '',
+            trigger_type: 'contains',
+            trigger_keyword: '',
+            response_message: '',
+            is_active: true
+          }
+        });
+
+        const apiKeys = ref([]);
+        const webhooks = ref([]);
+        const adminUsers = ref([]);
+        const availablePlans = ref([]);
+        const userSearchQuery = ref('');
+
+        const openPlanModal = ref(false);
+        const openAddDeviceModal = ref(false);
+        const openCreateKeyModal = ref(false);
+        const openCreateWebhookModal = ref(false);
+        const openAdminCreateUserModal = ref(false);
+        const openCreatePlanModal = ref(false);
+
+        const newKeyName = ref('');
+        const newWebhookForm = ref({ url: '', secret: '', events: '' });
+        const newDeviceForm = ref({ device_id: '' });
+        const adminUserForm = ref({ full_name: '', email: '', password: '', role: 'pelanggan', tier_id: 'ocean', duration_days: 30 });
+        const planForm = ref({
+          id: '',
+          name: '',
+          device_limit: 2,
+          message_limit: 100,
+          broadcast_limit: 5000,
+          api_key_limit: 1,
+          webhook_limit: 1,
+          duration_days: 30,
+          price_monthly: 99000,
+          description: ''
+        });
+
+        const editPlanModal = ref({
+          show: false,
+          form: {
+            id: '',
+            name: '',
+            device_limit: 1,
+            message_limit: 100,
+            broadcast_limit: 5000,
+            api_key_limit: 1,
+            webhook_limit: 1,
+            duration_days: 30,
+            price_monthly: 0,
+            description: ''
+          }
+        });
+
+        const renewModal = ref({ show: false, userId: null, userName: '' });
+        const qrModal = ref({ show: false, deviceId: '', qrImage: '' });
+        const codeModal = ref({ show: false, deviceId: '', phone: '', code: '', loading: false });
+
+        const loginForm = ref({ email: '', password: '', remember: false });
+
+        const messageForm = ref({
+          device_id: '',
+          recipients: '',
+          message: '',
+          file: null
+        });
+        const sendingBroadcast = ref(false);
+
+        const toast = ref({ show: false, message: '', type: 'info' });
+
+        const initIcons = () => {
+          nextTick(() => {
+            if (window.lucide && window.lucide.createIcons) {
+              window.lucide.createIcons();
+            }
+          });
+        };
+
+        const showToast = (message, type = 'info') => {
+          toast.value = { show: true, message, type };
+          initIcons();
+          setTimeout(() => { toast.value.show = false; }, 3500);
+        };
+
+        const toggleTheme = () => {
+          isDark.value = !isDark.value;
+          localStorage.setItem('theme', isDark.value ? 'dark' : 'light');
+          applyTheme();
+        };
+
+        const applyTheme = () => {
+          if (isDark.value) {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+          initIcons();
+        };
+
+        const isDeviceOnline = (dev) => {
+          if (!dev) return false;
+          const s = String(dev.state || '').toLowerCase();
+          return s === 'logged_in' || s === 'connected' || s === 'open' || (Boolean(dev.jid) && s !== 'disconnected');
+        };
+
+        const setActiveTab = (tab) => {
+          activeTab.value = tab;
+          mobileSidebarOpen.value = false;
+          if (tab === 'chats') {
+            if (!selectedChatDeviceId.value && devices.value.length > 0) {
+              const onlineDev = devices.value.find(d => isDeviceOnline(d));
+              selectedChatDeviceId.value = onlineDev ? onlineDev.id : devices.value[0].id;
+            }
+            fetchChats();
+          } else if (tab === 'auto-response') {
+            fetchAutoResponses();
+          }
+          initIcons();
+        };
+
+        const getAuthToken = () => {
+          return localStorage.getItem('gowa_auth_token') || '';
+        };
+
+        const setAuthToken = (token) => {
+          if (token) {
+            localStorage.setItem('gowa_auth_token', token);
+          } else {
+            localStorage.removeItem('gowa_auth_token');
+          }
+        };
+
+        const apiFetch = async (url, options = {}) => {
+          const token = getAuthToken();
+          const headers = {
+            'Content-Type': 'application/json',
+            ...(options.headers || {})
+          };
+          if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+          }
+
+          const response = await fetch(url, { ...options, headers });
+          if (response.status === 401 && !url.includes('/api/auth/login')) {
+            logout();
+            throw new Error('Session expired. Please sign in again.');
+          }
+          return response;
+        };
+
+        const handleLogin = async () => {
+          authLoading.value = true;
+          try {
+            const res = await fetch('/api/auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(loginForm.value)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Login failed');
+
+            setAuthToken(data.results.token);
+            currentUser.value = data.results.user;
+            isAuthenticated.value = true;
+            showToast('Signed in successfully.', 'success');
+
+            if (currentUser.value.role !== 'admin' && !currentUser.value.has_active_tier) {
+              openPlanModal.value = true;
+            }
+
+            fetchInitialData();
+          } catch (err) {
+            showToast(err.message, 'error');
+          } finally {
+            authLoading.value = false;
+          }
+        };
+
+        const logout = async () => {
+          try {
+            await apiFetch('/api/auth/logout', { method: 'POST' });
+          } catch (e) { }
+
+          setAuthToken('');
+          localStorage.removeItem('token');
+          sessionStorage.clear();
+
+          document.cookie.split(";").forEach((c) => {
+            const eqPos = c.indexOf("=");
+            const name = eqPos > -1 ? c.substr(0, eqPos).trim() : c.trim();
+            document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+            document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=" + window.location.hostname;
+          });
+
+          isAuthenticated.value = false;
+          currentUser.value = {};
+          loginForm.value = { email: '', password: '', remember: false };
+          showToast('Logged out.', 'info');
+          initIcons();
+        };
+
+        const fetchCurrentUser = async () => {
+          try {
+            const res = await apiFetch('/api/auth/me');
+            if (res.ok) {
+              const data = await res.json();
+              currentUser.value = data.results;
+              isAuthenticated.value = true;
+              initIcons();
+              return true;
+            }
+          } catch (e) { }
+          return false;
+        };
+
+        const fetchPlans = async () => {
+          try {
+            const res = await fetch('/api/plans');
+            if (res.ok) {
+              const data = await res.json();
+              availablePlans.value = data.results || [];
+              initIcons();
+            }
+          } catch (e) { }
+        };
+
+        const fetchInitialData = async () => {
+          await fetchCurrentUser();
+          fetchPlans();
+          fetchDevices();
+          fetchAutoResponses();
+          fetchApiKeys();
+          fetchWebhooks();
+          if (currentUser.value.role === 'admin') {
+            fetchAdminUsers();
+          }
+          initIcons();
+        };
+
+        const selectPlan = async (planId) => {
+          try {
+            const res = await apiFetch('/api/user/select-plan', {
+              method: 'POST',
+              body: JSON.stringify({ plan_id: planId })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed to select plan');
+
+            currentUser.value = data.results;
+            openPlanModal.value = false;
+            showToast(`Plan updated to ${data.results.tier_name}.`, 'success');
+            initIcons();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        };
+
+        const fetchDevices = async () => {
+          try {
+            const res = await apiFetch('/devices');
+            if (res.ok) {
+              const data = await res.json();
+              devices.value = data.results || [];
+              if (!selectedChatDeviceId.value && devices.value.length > 0) {
+                const onlineDev = devices.value.find(d => isDeviceOnline(d));
+                selectedChatDeviceId.value = onlineDev ? onlineDev.id : devices.value[0].id;
+              }
+              initIcons();
+            }
+          } catch (e) { }
+        };
+
+        const createDeviceSlot = async () => {
+          try {
+            const res = await apiFetch('/devices', {
+              method: 'POST',
+              body: JSON.stringify(newDeviceForm.value)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed to create device');
+
+            openAddDeviceModal.value = false;
+            newDeviceForm.value.device_id = '';
+            showToast('Device slot created. Pair via QR code now.', 'success');
+            fetchDevices();
+            fetchCurrentUser();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        };
+
+        const openQRModal = async (deviceId) => {
+          qrModal.value = { show: true, deviceId, qrImage: '' };
+          refreshQR();
+        };
+
+        const refreshQR = async () => {
+          const devId = qrModal.value.deviceId;
+          if (!devId) return;
+          try {
+            const res = await apiFetch(`/devices/${devId}/login`);
+            if (res.ok) {
+              const data = await res.json();
+              qrModal.value.qrImage = data.results.qr_link || data.results.qr_duration || '';
+            }
+          } catch (e) { }
+        };
+
+        const closeQRModal = () => {
+          qrModal.value.show = false;
+          fetchDevices();
+        };
+
+        const openCodeModal = (deviceId) => {
+          codeModal.value = { show: true, deviceId, phone: '', code: '', loading: false };
+        };
+
+        const generatePairingCode = async () => {
+          codeModal.value.loading = true;
+          try {
+            const res = await apiFetch(`/devices/${codeModal.value.deviceId}/login/code`, {
+              method: 'POST',
+              body: JSON.stringify({ phone: codeModal.value.phone })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed to generate code');
+
+            codeModal.value.code = data.results.pair_code;
+            showToast('Pairing code generated.', 'success');
+          } catch (err) {
+            showToast(err.message, 'error');
+          } finally {
+            codeModal.value.loading = false;
+          }
+        };
+
+        const reconnectDevice = async (deviceId) => {
+          try {
+            await apiFetch(`/devices/${deviceId}/reconnect`, { method: 'POST' });
+            showToast('Reconnecting...', 'info');
+            setTimeout(fetchDevices, 1500);
+          } catch (e) { }
+        };
+
+        const logoutDevice = async (deviceId) => {
+          try {
+            await apiFetch(`/devices/${deviceId}/logout`, { method: 'POST' });
+            showToast('Device logged out.', 'info');
+            fetchDevices();
+          } catch (e) { }
+        };
+
+        const deleteDevice = async (deviceId) => {
+          if (!confirm(`Delete device slot ${deviceId}?`)) return;
+          try {
+            await apiFetch(`/devices/${deviceId}`, { method: 'DELETE' });
+            showToast('Device slot deleted.', 'info');
+            fetchDevices();
+            fetchCurrentUser();
+          } catch (e) { }
+        };
+
+        const parseRecipientsList = () => {
+          return messageForm.value.recipients
+            .split(/[\n,]+/)
+            .map(s => s.trim().replace(/[^0-9]/g, ''))
+            .filter(Boolean);
+        };
+
+        const sendBroadcast = async () => {
+          const recipients = parseRecipientsList();
+          if (recipients.length === 0 || !messageForm.value.message) {
+            showToast('Please provide valid recipient phone numbers and message body.', 'error');
+            return;
+          }
+
+          sendingBroadcast.value = true;
+          let successCount = 0;
+          let failCount = 0;
+
+          const devHeader = messageForm.value.device_id ? { 'X-Device-Id': messageForm.value.device_id } : {};
+
+          for (const phone of recipients) {
+            try {
+              const res = await apiFetch('/send/message', {
+                method: 'POST',
+                headers: devHeader,
+                body: JSON.stringify({ phone, message: messageForm.value.message })
+              });
+              if (res.ok) successCount++;
+              else failCount++;
+            } catch (e) {
+              failCount++;
+            }
+          }
+
+          sendingBroadcast.value = false;
+          showToast(`Broadcast completed: ${successCount} sent, ${failCount} failed.`, successCount > 0 ? 'success' : 'error');
+          fetchCurrentUser();
+        };
+
+        // CHATS & CONVERSATION HISTORY METHODS
+        const fetchChats = async () => {
+          loadingChats.value = true;
+          try {
+            const devHeader = selectedChatDeviceId.value ? { 'X-Device-Id': selectedChatDeviceId.value } : {};
+            const res = await apiFetch('/chats?limit=50', { headers: devHeader });
+            if (res.ok) {
+              const json = await res.json();
+              const result = json.results;
+              if (result && Array.isArray(result.data)) {
+                chats.value = result.data;
+              } else if (Array.isArray(result)) {
+                chats.value = result;
+              } else {
+                chats.value = [];
+              }
+              initIcons();
+            }
+          } catch (e) {
+          } finally {
+            loadingChats.value = false;
+          }
+        };
+
+        const filteredChats = computed(() => {
+          if (!chatSearchQuery.value) return chats.value;
+          const q = chatSearchQuery.value.toLowerCase();
+          return chats.value.filter(c =>
+            (c.name && c.name.toLowerCase().includes(q)) ||
+            (c.jid && c.jid.toLowerCase().includes(q))
+          );
+        });
+
+        const onChatDeviceChange = () => {
+          activeChat.value = null;
+          chatMessages.value = [];
+          fetchChats();
+        };
+
+        const selectChat = (chat) => {
+          activeChat.value = chat;
+          fetchMessages(chat.jid);
+        };
+
+        const fetchMessages = async (chatJid) => {
+          if (!chatJid) return;
+          loadingMessages.value = true;
+          try {
+            const devHeader = selectedChatDeviceId.value ? { 'X-Device-Id': selectedChatDeviceId.value } : {};
+            const res = await apiFetch(`/chat/${encodeURIComponent(chatJid)}/messages?limit=100`, { headers: devHeader });
+            if (res.ok) {
+              const json = await res.json();
+              const result = json.results;
+              let list = [];
+              if (result && Array.isArray(result.data)) {
+                list = result.data;
+              } else if (Array.isArray(result)) {
+                list = result;
+              }
+              chatMessages.value = list.reverse();
+              initIcons();
+            }
+          } catch (e) {
+          } finally {
+            loadingMessages.value = false;
+          }
+        };
+
+        const sendQuickReply = async () => {
+          if (!activeChat.value || !quickReplyText.value.trim()) return;
+          sendingReply.value = true;
+          try {
+            const targetPhone = activeChat.value.jid.replace('@s.whatsapp.net', '').replace('@g.us', '');
+            const devHeader = selectedChatDeviceId.value ? { 'X-Device-Id': selectedChatDeviceId.value } : {};
+            const res = await apiFetch('/send/message', {
+              method: 'POST',
+              headers: devHeader,
+              body: JSON.stringify({ phone: targetPhone, message: quickReplyText.value })
+            });
+            if (res.ok) {
+              chatMessages.value.push({
+                id: 'tmp-' + Date.now(),
+                chat_jid: activeChat.value.jid,
+                content: quickReplyText.value,
+                is_from_me: true,
+                timestamp: new Date().toISOString()
+              });
+              quickReplyText.value = '';
+              showToast('Reply sent.', 'success');
+              setTimeout(() => fetchMessages(activeChat.value.jid), 1500);
+            } else {
+              const err = await res.json();
+              showToast(err.message || 'Failed to send message', 'error');
+            }
+          } catch (e) {
+            showToast('Failed to send reply: ' + e.message, 'error');
+          } finally {
+            sendingReply.value = false;
+          }
+        };
+
+        // AUTO RESPONSE METHODS
+        const fetchAutoResponses = async () => {
+          try {
+            const res = await apiFetch('/api/user/auto-responses');
+            if (res.ok) {
+              const data = await res.json();
+              autoResponses.value = data.results || [];
+              initIcons();
+            }
+          } catch (e) { }
+        };
+
+        const createAutoResponseRule = async () => {
+          try {
+            const res = await apiFetch('/api/user/auto-responses', {
+              method: 'POST',
+              body: JSON.stringify(autoResponseForm.value)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed to save auto response');
+
+            openCreateAutoResponseModal.value = false;
+            autoResponseForm.value = { device_id: '', trigger_type: 'contains', trigger_keyword: '', response_message: '', is_active: true };
+            showToast('Auto response rule created.', 'success');
+            fetchAutoResponses();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        };
+
+        const openEditAutoResponseModalFor = (rule) => {
+          editAutoResponseModal.value = {
+            show: true,
+            form: {
+              id: rule.id,
+              device_id: rule.device_id || '',
+              trigger_type: rule.trigger_type || 'contains',
+              trigger_keyword: rule.trigger_keyword,
+              response_message: rule.response_message,
+              is_active: rule.is_active
+            }
+          };
+          initIcons();
+        };
+
+        const updateAutoResponseRule = async () => {
+          const f = editAutoResponseModal.value.form;
+          try {
+            const res = await apiFetch(`/api/user/auto-responses/${f.id}`, {
+              method: 'PUT',
+              body: JSON.stringify(f)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed to update rule');
+
+            editAutoResponseModal.value.show = false;
+            showToast('Auto response rule updated.', 'success');
+            fetchAutoResponses();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        };
+
+        const toggleAutoResponseActive = async (rule) => {
+          const newStatus = !rule.is_active;
+          try {
+            const res = await apiFetch(`/api/user/auto-responses/${rule.id}`, {
+              method: 'PUT',
+              body: JSON.stringify({ is_active: newStatus })
+            });
+            if (res.ok) {
+              rule.is_active = newStatus;
+              showToast(newStatus ? 'Rule enabled.' : 'Rule disabled.', 'info');
+              initIcons();
+            }
+          } catch (e) { }
+        };
+
+        const deleteAutoResponse = async (id) => {
+          if (!confirm('Delete this auto response rule?')) return;
+          try {
+            const res = await apiFetch(`/api/user/auto-responses/${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Failed to delete rule');
+            showToast('Rule deleted.', 'info');
+            fetchAutoResponses();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        };
+
+        const fetchApiKeys = async () => {
+          try {
+            const res = await apiFetch('/api/user/api-keys');
+            if (res.ok) {
+              const data = await res.json();
+              apiKeys.value = data.results || [];
+              initIcons();
+            }
+          } catch (e) { }
+        };
+
+        const generateApiKey = async () => {
+          try {
+            const res = await apiFetch('/api/user/api-keys', {
+              method: 'POST',
+              body: JSON.stringify({ name: newKeyName.value })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed to create key');
+
+            openCreateKeyModal.value = false;
+            newKeyName.value = '';
+            showToast('API Key created.', 'success');
+            fetchApiKeys();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        };
+
+        const deleteApiKey = async (id) => {
+          if (!confirm('Delete this API Key?')) return;
+          try {
+            await apiFetch(`/api/user/api-keys/${id}`, { method: 'DELETE' });
+            showToast('API Key deleted.', 'info');
+            fetchApiKeys();
+          } catch (e) { }
+        };
+
+        const fetchWebhooks = async () => {
+          try {
+            const res = await apiFetch('/api/user/webhooks');
+            if (res.ok) {
+              const data = await res.json();
+              webhooks.value = data.results || [];
+              initIcons();
+            }
+          } catch (e) { }
+        };
+
+        const createWebhookEndpoint = async () => {
+          try {
+            const res = await apiFetch('/api/user/webhooks', {
+              method: 'POST',
+              body: JSON.stringify(newWebhookForm.value)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed to create webhook');
+
+            openCreateWebhookModal.value = false;
+            newWebhookForm.value = { url: '', secret: '', events: '' };
+            showToast('Webhook endpoint added.', 'success');
+            fetchWebhooks();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        };
+
+        const deleteWebhook = async (id) => {
+          if (!confirm('Delete this webhook?')) return;
+          try {
+            await apiFetch(`/api/user/webhooks/${id}`, { method: 'DELETE' });
+            showToast('Webhook deleted.', 'info');
+            fetchWebhooks();
+          } catch (e) { }
+        };
+
+        const fetchAdminUsers = async () => {
+          try {
+            const res = await apiFetch('/api/admin/users');
+            if (res.ok) {
+              const data = await res.json();
+              adminUsers.value = data.results || [];
+              initIcons();
+            }
+          } catch (e) { }
+        };
+
+        const filteredAdminUsers = computed(() => {
+          if (!userSearchQuery.value) return adminUsers.value;
+          const q = userSearchQuery.value.toLowerCase();
+          return adminUsers.value.filter(u =>
+            (u.full_name && u.full_name.toLowerCase().includes(q)) ||
+            (u.email && u.email.toLowerCase().includes(q))
+          );
+        });
+
+        const adminCreateUser = async () => {
+          try {
+            const res = await apiFetch('/api/admin/users', {
+              method: 'POST',
+              body: JSON.stringify(adminUserForm.value)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed to create user');
+
+            openAdminCreateUserModal.value = false;
+            adminUserForm.value = { full_name: '', email: '', password: '', role: 'pelanggan', tier_id: 'ocean', duration_days: 30 };
+            showToast('User created successfully.', 'success');
+            fetchAdminUsers();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        };
+
+        const openRenewModalForUser = (user) => {
+          renewModal.value = { show: true, userId: user.id, userName: user.full_name || user.email };
+          initIcons();
+        };
+
+        const adminRenew = async (days) => {
+          try {
+            const res = await apiFetch(`/api/admin/users/${renewModal.value.userId}/renew`, {
+              method: 'POST',
+              body: JSON.stringify({ duration_days: days })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed to renew');
+
+            renewModal.value.show = false;
+            showToast(`Renewed for +${days} days.`, 'success');
+            fetchAdminUsers();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        };
+
+        const openChangePlanModalForUser = (user) => {
+          const currentTier = user.tier_id || 'ocean';
+          const nextTier = availablePlans.value.find(p => p.id !== currentTier)?.id || 'sea';
+          const targetTier = prompt(`Enter tier ID to assign to ${user.full_name}:`, nextTier);
+          if (!targetTier) return;
+
+          apiFetch(`/api/admin/users/${user.id}/plan`, {
+            method: 'PUT',
+            body: JSON.stringify({ tier_id: targetTier, duration_days: 30 })
+          }).then(async (res) => {
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed to update plan');
+            showToast('Plan updated.', 'success');
+            fetchAdminUsers();
+          }).catch(err => showToast(err.message, 'error'));
+        };
+
+        const adminDeleteUser = async (userId) => {
+          if (!confirm('Are you sure you want to delete this user?')) return;
+          try {
+            await apiFetch(`/api/admin/users/${userId}`, { method: 'DELETE' });
+            showToast('User deleted.', 'info');
+            fetchAdminUsers();
+          } catch (e) { }
+        };
+
+        // ADMIN PLAN METHODS
+        const adminCreatePlan = async () => {
+          try {
+            const res = await apiFetch('/api/admin/plans', {
+              method: 'POST',
+              body: JSON.stringify(planForm.value)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed to create plan');
+
+            openCreatePlanModal.value = false;
+            planForm.value = { id: '', name: '', device_limit: 2, message_limit: 100, broadcast_limit: 5000, api_key_limit: 1, webhook_limit: 1, duration_days: 30, price_monthly: 99000, description: '' };
+            showToast('Plan created successfully.', 'success');
+            fetchPlans();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        };
+
+        const openEditPlanModalFor = (plan) => {
+          editPlanModal.value = {
+            show: true,
+            form: {
+              id: plan.id,
+              name: plan.name,
+              device_limit: plan.device_limit,
+              message_limit: plan.message_limit != null ? plan.message_limit : 100,
+              broadcast_limit: plan.broadcast_limit,
+              api_key_limit: plan.api_key_limit,
+              webhook_limit: plan.webhook_limit,
+              duration_days: plan.duration_days,
+              price_monthly: plan.price_monthly,
+              description: plan.description || ''
+            }
+          };
+          initIcons();
+        };
+
+        const adminUpdatePlan = async () => {
+          const p = editPlanModal.value.form;
+          try {
+            const res = await apiFetch(`/api/admin/plans/${p.id}`, {
+              method: 'PUT',
+              body: JSON.stringify(p)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed to update plan');
+
+            editPlanModal.value.show = false;
+            showToast('Plan updated.', 'success');
+            fetchPlans();
+            fetchCurrentUser();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        };
+
+        const adminDeletePlan = async (planId) => {
+          if (!confirm(`Delete plan ${planId}? Users on this plan will retain their active period until renewal.`)) return;
+          try {
+            const res = await apiFetch(`/api/admin/plans/${planId}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Failed to delete plan');
+            showToast('Plan deleted.', 'info');
+            fetchPlans();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        };
+
+        const adminResetAllQuotas = async () => {
+          if (!confirm('Are you sure you want to reset all user message & broadcast quotas to 0 now? (Automated reset also runs on the 1st of every month)')) return;
+          try {
+            const res = await apiFetch('/api/admin/reset-quotas', { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed to reset quotas');
+            showToast(data.message || 'All user quotas reset successfully.', 'success');
+            fetchCurrentUser();
+            fetchAdminUsers();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        };
+
+        const copyToClipboard = (text) => {
+          navigator.clipboard.writeText(text);
+          showToast('Copied to clipboard.', 'info');
+        };
+
+        const formatDate = (dateStr) => {
+          if (!dateStr) return '-';
+          return new Date(dateStr).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          });
+        };
+
+        const formatTime = (timeStr) => {
+          if (!timeStr) return '';
+          return new Date(timeStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        };
+
+        // Real-time WebSocket connection for instant event broadcasts
+        const initWebSocket = () => {
+          try {
+            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${location.host}/ws`;
+            const socket = new WebSocket(wsUrl);
+
+            socket.onmessage = (event) => {
+              try {
+                const msg = JSON.parse(event.data);
+                fetchDevices();
+                if (activeChat.value) {
+                  fetchMessages(activeChat.value.jid);
+                }
+              } catch (e) { }
+            };
+
+            socket.onclose = () => {
+              setTimeout(initWebSocket, 4000);
+            };
+          } catch (e) { }
+        };
+
+        onMounted(async () => {
+          const savedTheme = localStorage.getItem('theme');
+          if (savedTheme) {
+            isDark.value = savedTheme === 'dark';
+          } else {
+            isDark.value = true;
+          }
+          applyTheme();
+
+          fetchPlans();
+
+          const loggedIn = await fetchCurrentUser();
+          if (loggedIn) {
+            fetchInitialData();
+            initWebSocket();
+            // Polling interval to ensure online status changes reflect in real-time
+            setInterval(() => {
+              if (isAuthenticated.value) {
+                fetchDevices();
+              }
+            }, 3500);
+          }
+          initIcons();
+        });
+
+        return {
+          isDark,
+          toggleTheme,
+          mobileSidebarOpen,
+          isAuthenticated,
+          authLoading,
+          activeTab,
+          setActiveTab,
+          currentUser,
+          devices,
+          chats,
+          activeChat,
+          chatMessages,
+          selectedChatDeviceId,
+          chatSearchQuery,
+          quickReplyText,
+          loadingChats,
+          loadingMessages,
+          sendingReply,
+          filteredChats,
+          autoResponses,
+          openCreateAutoResponseModal,
+          autoResponseForm,
+          editAutoResponseModal,
+          fetchAutoResponses,
+          createAutoResponseRule,
+          openEditAutoResponseModalFor,
+          updateAutoResponseRule,
+          toggleAutoResponseActive,
+          deleteAutoResponse,
+          apiKeys,
+          webhooks,
+          adminUsers,
+          availablePlans,
+          userSearchQuery,
+          filteredAdminUsers,
+          loginForm,
+          messageForm,
+          sendingBroadcast,
+          newKeyName,
+          newWebhookForm,
+          newDeviceForm,
+          adminUserForm,
+          planForm,
+          editPlanModal,
+          openPlanModal,
+          openAddDeviceModal,
+          openCreateKeyModal,
+          openCreateWebhookModal,
+          openAdminCreateUserModal,
+          openCreatePlanModal,
+          renewModal,
+          qrModal,
+          codeModal,
+          toast,
+          showToast,
+          handleLogin,
+          logout,
+          selectPlan,
+          fetchInitialData,
+          createDeviceSlot,
+          openQRModal,
+          refreshQR,
+          closeQRModal,
+          openCodeModal,
+          generatePairingCode,
+          reconnectDevice,
+          logoutDevice,
+          deleteDevice,
+          parseRecipientsList,
+          sendBroadcast,
+          fetchChats,
+          onChatDeviceChange,
+          selectChat,
+          fetchMessages,
+          sendQuickReply,
+          generateApiKey,
+          deleteApiKey,
+          createWebhookEndpoint,
+          deleteWebhook,
+          adminCreateUser,
+          openRenewModalForUser,
+          adminRenew,
+          openChangePlanModalForUser,
+          adminDeleteUser,
+          adminCreatePlan,
+          openEditPlanModalFor,
+          adminUpdatePlan,
+          adminDeletePlan,
+          adminResetAllQuotas,
+          copyToClipboard,
+          formatDate,
+          formatTime,
+          isDeviceOnline
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+
+</html>

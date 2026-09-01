@@ -153,6 +153,7 @@ type DeviceRecord struct {
 	DisplayName               string    `db:"display_name"`
 	JID                       string    `db:"jid"`
 	ADJID                     string    `db:"ad_jid"`
+	UserID                    int64     `db:"user_id"`
 	WebhookURL                *string   `db:"webhook_url"`
 	WebhookSecret             string    `db:"webhook_secret"`
 	WebhookEvents             string    `db:"webhook_events"`

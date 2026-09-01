@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
+	domainAuth "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/auth"
 	domainChatStorage "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/chatstorage"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/infrastructure/whatsapp"
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/pkg/utils"
@@ -15,6 +17,7 @@ import (
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // SQLiteRepository implements Repository using SQLite
@@ -1563,9 +1566,9 @@ func (r *SQLiteRepository) SaveDeviceRecord(record *domainChatStorage.DeviceReco
 
 	// Try update first, then insert if no rows affected (cross-db compatible)
 	result, err := r.db.Exec(`
-		UPDATE devices SET display_name = ?, jid = ?, ad_jid = ?, updated_at = ?
+		UPDATE devices SET display_name = ?, jid = ?, ad_jid = ?, user_id = CASE WHEN ? > 0 THEN ? ELSE user_id END, updated_at = ?
 		WHERE device_id = ?
-	`, record.DisplayName, record.JID, record.ADJID, record.UpdatedAt, record.DeviceID)
+	`, record.DisplayName, record.JID, record.ADJID, record.UserID, record.UserID, record.UpdatedAt, record.DeviceID)
 	if err != nil {
 		return err
 	}
@@ -1573,9 +1576,9 @@ func (r *SQLiteRepository) SaveDeviceRecord(record *domainChatStorage.DeviceReco
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
 		_, err = r.db.Exec(`
-			INSERT INTO devices (device_id, display_name, jid, ad_jid, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?)
-		`, record.DeviceID, record.DisplayName, record.JID, record.ADJID, record.CreatedAt, record.UpdatedAt)
+			INSERT INTO devices (device_id, display_name, jid, ad_jid, user_id, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
+		`, record.DeviceID, record.DisplayName, record.JID, record.ADJID, record.UserID, record.CreatedAt, record.UpdatedAt)
 	}
 	return err
 }
@@ -1583,7 +1586,7 @@ func (r *SQLiteRepository) SaveDeviceRecord(record *domainChatStorage.DeviceReco
 // ListDeviceRecords returns all registered devices.
 func (r *SQLiteRepository) ListDeviceRecords() ([]*domainChatStorage.DeviceRecord, error) {
 	rows, err := r.db.Query(`
-		SELECT device_id, display_name, jid, COALESCE(ad_jid, ''), created_at, updated_at
+		SELECT device_id, display_name, jid, COALESCE(ad_jid, ''), COALESCE(user_id, 0), created_at, updated_at
 		FROM devices
 		ORDER BY created_at ASC
 	`)
@@ -1595,7 +1598,7 @@ func (r *SQLiteRepository) ListDeviceRecords() ([]*domainChatStorage.DeviceRecor
 	var records []*domainChatStorage.DeviceRecord
 	for rows.Next() {
 		var rec domainChatStorage.DeviceRecord
-		if err := rows.Scan(&rec.DeviceID, &rec.DisplayName, &rec.JID, &rec.ADJID, &rec.CreatedAt, &rec.UpdatedAt); err != nil {
+		if err := rows.Scan(&rec.DeviceID, &rec.DisplayName, &rec.JID, &rec.ADJID, &rec.UserID, &rec.CreatedAt, &rec.UpdatedAt); err != nil {
 			return nil, err
 		}
 		records = append(records, &rec)
@@ -1612,11 +1615,11 @@ func (r *SQLiteRepository) GetDeviceRecord(deviceID string) (*domainChatStorage.
 
 	rec := &domainChatStorage.DeviceRecord{}
 	err := r.db.QueryRow(`
-		SELECT device_id, display_name, jid, COALESCE(ad_jid, ''), created_at, updated_at
+		SELECT device_id, display_name, jid, COALESCE(ad_jid, ''), COALESCE(user_id, 0), created_at, updated_at
 		FROM devices
 		WHERE device_id = ?
 		LIMIT 1
-	`, deviceID).Scan(&rec.DeviceID, &rec.DisplayName, &rec.JID, &rec.ADJID, &rec.CreatedAt, &rec.UpdatedAt)
+	`, deviceID).Scan(&rec.DeviceID, &rec.DisplayName, &rec.JID, &rec.ADJID, &rec.UserID, &rec.CreatedAt, &rec.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -2022,7 +2025,7 @@ func extractEditedMessage(msg *waE2E.Message) *waE2E.Message {
 	return protocolMessage.GetEditedMessage()
 }
 
-func (r *SQLiteRepository) storeEditedMessage(ctx context.Context, evt *events.Message, deviceID, chatJID, sender string, editedMessage *waE2E.Message) error {
+func (r *SQLiteRepository) storeEditedMessage(_ context.Context, evt *events.Message, deviceID, chatJID, sender string, editedMessage *waE2E.Message) error {
 	if evt == nil || editedMessage == nil {
 		return nil
 	}
@@ -2522,6 +2525,10 @@ func (r *SQLiteRepository) InitializeSchema() error {
 		}
 	}
 
+	// Seed default admin & plans if not exists
+	_ = r.seedDefaultAdmin()
+	_ = r.seedDefaultPlans()
+
 	return nil
 }
 
@@ -2804,5 +2811,814 @@ func (r *SQLiteRepository) getMigrations() []string {
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (device_id, chat_jid, poll_message_id)
 		)`,
+
+		// Migration 45: SaaS Users table
+		`CREATE TABLE IF NOT EXISTS app_users (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			email VARCHAR(255) NOT NULL UNIQUE,
+			full_name VARCHAR(255) NOT NULL,
+			password_hash VARCHAR(255) NOT NULL,
+			role VARCHAR(50) NOT NULL DEFAULT 'pelanggan',
+			tier_id VARCHAR(50) DEFAULT '',
+			tier_name VARCHAR(50) DEFAULT '',
+			tier_expires_at TIMESTAMP NULL,
+			broadcast_count INTEGER DEFAULT 0,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
+
+		// Migration 46: Developer API Keys table
+		`CREATE TABLE IF NOT EXISTS api_keys (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL,
+			key_value VARCHAR(255) NOT NULL UNIQUE,
+			name VARCHAR(255) NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
+
+		// Migration 47: Developer Webhooks table
+		`CREATE TABLE IF NOT EXISTS user_webhooks (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL,
+			url TEXT NOT NULL,
+			secret VARCHAR(255) DEFAULT '',
+			events TEXT DEFAULT '',
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
+
+		// Migration 48: Add user_id column to devices table
+		`ALTER TABLE devices ADD COLUMN user_id INTEGER DEFAULT 0`,
+
+		// Migration 49: Subscription Plans table
+		`CREATE TABLE IF NOT EXISTS plans (
+			id VARCHAR(50) PRIMARY KEY,
+			name VARCHAR(100) NOT NULL,
+			device_limit INTEGER NOT NULL DEFAULT 1,
+			broadcast_limit INTEGER NOT NULL DEFAULT 5000,
+			api_key_limit INTEGER NOT NULL DEFAULT 1,
+			webhook_limit INTEGER NOT NULL DEFAULT 1,
+			duration_days INTEGER NOT NULL DEFAULT 30,
+			price_monthly INTEGER NOT NULL DEFAULT 0,
+			description TEXT DEFAULT '',
+			is_active INTEGER DEFAULT 1,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
+
+		// Migration 50: Auto Responses table
+		`CREATE TABLE IF NOT EXISTS auto_responses (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL,
+			device_id VARCHAR(100) NOT NULL DEFAULT '',
+			trigger_type VARCHAR(20) NOT NULL DEFAULT 'contains',
+			trigger_keyword TEXT NOT NULL,
+			response_message TEXT NOT NULL,
+			is_active INTEGER NOT NULL DEFAULT 1,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_auto_responses_user ON auto_responses(user_id, is_active)`,
+		`CREATE INDEX IF NOT EXISTS idx_auto_responses_device ON auto_responses(device_id, is_active)`,
+
+		// Migration 51: Add message_count to app_users
+		`ALTER TABLE app_users ADD COLUMN message_count INTEGER NOT NULL DEFAULT 0`,
+
+		// Migration 52: Add message_limit to plans
+		`ALTER TABLE plans ADD COLUMN message_limit INTEGER NOT NULL DEFAULT 100`,
+
+		// Migration 53: Table tracking monthly quota resets
+		`CREATE TABLE IF NOT EXISTS quota_resets (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			period VARCHAR(20) NOT NULL UNIQUE,
+			reset_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			affected_users INTEGER NOT NULL DEFAULT 0
+		)`,
 	}
 }
+
+// _____________________________________________________________________________________________________________________
+// SaaS Users, Plans, API Keys & Webhooks Implementation
+
+func (r *SQLiteRepository) seedDefaultAdmin() error {
+	adminEmail := strings.TrimSpace(strings.ToLower(config.GowaEmail))
+	if adminEmail == "" {
+		adminEmail = "admin@example.com"
+	}
+	adminPassword := config.GowaPassword
+	if adminPassword == "" {
+		adminPassword = "admin"
+	}
+
+	existing, _ := r.GetUserByEmail(adminEmail)
+	if existing != nil {
+		return nil
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(adminPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	tenYearsLater := time.Now().AddDate(10, 0, 0)
+	adminUser := &domainAuth.User{
+		Email:         adminEmail,
+		FullName:      "Administrator",
+		PasswordHash:  string(hash),
+		Role:          domainAuth.RoleAdmin,
+		TierID:        domainAuth.PlanSea,
+		TierName:      "Sea",
+		TierExpiresAt: &tenYearsLater,
+	}
+
+	if err := r.CreateUser(adminUser); err != nil {
+		logrus.Errorf("[SAAS_INIT] Failed to seed default admin: %v", err)
+		return err
+	}
+	logrus.Infof("[SAAS_INIT] Seeded default admin account: %s", adminEmail)
+	return nil
+}
+
+func (r *SQLiteRepository) CreateUser(user *domainAuth.User) error {
+	if user == nil {
+		return fmt.Errorf("user is required")
+	}
+	now := time.Now()
+	if user.CreatedAt.IsZero() {
+		user.CreatedAt = now
+	}
+	user.UpdatedAt = now
+	if user.Role == "" {
+		user.Role = domainAuth.RolePelanggan
+	}
+
+	res, err := r.db.Exec(`
+		INSERT INTO app_users (email, full_name, password_hash, role, tier_id, tier_name, tier_expires_at, message_count, broadcast_count, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, user.Email, user.FullName, user.PasswordHash, string(user.Role), string(user.TierID), user.TierName, user.TierExpiresAt, user.MessageCount, user.BroadcastCount, user.CreatedAt, user.UpdatedAt)
+	if err != nil {
+		return err
+	}
+
+	id, err := res.LastInsertId()
+	if err == nil {
+		user.ID = id
+	}
+	return nil
+}
+
+func (r *SQLiteRepository) GetUserByEmail(email string) (*domainAuth.User, error) {
+	email = strings.TrimSpace(strings.ToLower(email))
+	if email == "" {
+		return nil, fmt.Errorf("email is required")
+	}
+
+	row := r.db.QueryRow(`
+		SELECT id, email, full_name, password_hash, role, tier_id, tier_name, tier_expires_at, message_count, broadcast_count, created_at, updated_at
+		FROM app_users
+		WHERE LOWER(email) = ?
+		LIMIT 1
+	`, email)
+
+	var u domainAuth.User
+	var roleStr, tierIDStr string
+	var expiresAt sql.NullTime
+	if err := row.Scan(&u.ID, &u.Email, &u.FullName, &u.PasswordHash, &roleStr, &tierIDStr, &u.TierName, &expiresAt, &u.MessageCount, &u.BroadcastCount, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	u.Role = domainAuth.Role(roleStr)
+	u.TierID = domainAuth.PlanID(tierIDStr)
+	if expiresAt.Valid {
+		u.TierExpiresAt = &expiresAt.Time
+	}
+	return &u, nil
+}
+
+func (r *SQLiteRepository) GetUserByID(id int64) (*domainAuth.User, error) {
+	if id <= 0 {
+		return nil, fmt.Errorf("invalid user id")
+	}
+
+	row := r.db.QueryRow(`
+		SELECT id, email, full_name, password_hash, role, tier_id, tier_name, tier_expires_at, message_count, broadcast_count, created_at, updated_at
+		FROM app_users
+		WHERE id = ?
+		LIMIT 1
+	`, id)
+
+	var u domainAuth.User
+	var roleStr, tierIDStr string
+	var expiresAt sql.NullTime
+	if err := row.Scan(&u.ID, &u.Email, &u.FullName, &u.PasswordHash, &roleStr, &tierIDStr, &u.TierName, &expiresAt, &u.MessageCount, &u.BroadcastCount, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	u.Role = domainAuth.Role(roleStr)
+	u.TierID = domainAuth.PlanID(tierIDStr)
+	if expiresAt.Valid {
+		u.TierExpiresAt = &expiresAt.Time
+	}
+	return &u, nil
+}
+
+func (r *SQLiteRepository) UpdateUser(user *domainAuth.User) error {
+	if user == nil || user.ID <= 0 {
+		return fmt.Errorf("user id is required")
+	}
+	user.UpdatedAt = time.Now()
+
+	_, err := r.db.Exec(`
+		UPDATE app_users
+		SET email = ?, full_name = ?, password_hash = ?, role = ?, tier_id = ?, tier_name = ?, tier_expires_at = ?, message_count = ?, broadcast_count = ?, updated_at = ?
+		WHERE id = ?
+	`, user.Email, user.FullName, user.PasswordHash, string(user.Role), string(user.TierID), user.TierName, user.TierExpiresAt, user.MessageCount, user.BroadcastCount, user.UpdatedAt, user.ID)
+	return err
+}
+
+func (r *SQLiteRepository) UpdateUserTier(userID int64, tierID domainAuth.PlanID, tierName string, expiresAt *time.Time) error {
+	if userID <= 0 {
+		return fmt.Errorf("invalid user id")
+	}
+	_, err := r.db.Exec(`
+		UPDATE app_users
+		SET tier_id = ?, tier_name = ?, tier_expires_at = ?, updated_at = ?
+		WHERE id = ?
+	`, string(tierID), tierName, expiresAt, time.Now(), userID)
+	return err
+}
+
+func (r *SQLiteRepository) IncrementMessageCount(userID int64, count int) error {
+	if userID <= 0 {
+		return nil
+	}
+	_, err := r.db.Exec(`
+		UPDATE app_users
+		SET message_count = message_count + ?, updated_at = ?
+		WHERE id = ?
+	`, count, time.Now(), userID)
+	return err
+}
+
+func (r *SQLiteRepository) IncrementBroadcastCount(userID int64, count int) error {
+	if userID <= 0 {
+		return nil
+	}
+	_, err := r.db.Exec(`
+		UPDATE app_users
+		SET broadcast_count = broadcast_count + ?, updated_at = ?
+		WHERE id = ?
+	`, count, time.Now(), userID)
+	return err
+}
+
+func (r *SQLiteRepository) ResetDailyMessageQuotas(ctx context.Context, period string) (int64, error) {
+	now := time.Now()
+	res, err := r.db.ExecContext(ctx, `
+		UPDATE app_users
+		SET message_count = 0, updated_at = ?
+	`, now)
+	if err != nil {
+		return 0, err
+	}
+	affected, _ := res.RowsAffected()
+
+	if period != "" {
+		_, _ = r.db.ExecContext(ctx, `
+			INSERT INTO quota_resets (period, reset_at, affected_users)
+			VALUES (?, ?, ?)
+			ON CONFLICT(period) DO UPDATE SET reset_at = excluded.reset_at, affected_users = excluded.affected_users
+		`, period, now, affected)
+	}
+	return affected, nil
+}
+
+func (r *SQLiteRepository) ResetMonthlyBroadcastQuotas(ctx context.Context, period string) (int64, error) {
+	now := time.Now()
+	res, err := r.db.ExecContext(ctx, `
+		UPDATE app_users
+		SET broadcast_count = 0, updated_at = ?
+	`, now)
+	if err != nil {
+		return 0, err
+	}
+	affected, _ := res.RowsAffected()
+
+	if period != "" {
+		_, _ = r.db.ExecContext(ctx, `
+			INSERT INTO quota_resets (period, reset_at, affected_users)
+			VALUES (?, ?, ?)
+			ON CONFLICT(period) DO UPDATE SET reset_at = excluded.reset_at, affected_users = excluded.affected_users
+		`, period, now, affected)
+	}
+	return affected, nil
+}
+
+func (r *SQLiteRepository) ResetMonthlyQuotas(ctx context.Context, period string) (int64, error) {
+	now := time.Now()
+	res, err := r.db.ExecContext(ctx, `
+		UPDATE app_users
+		SET message_count = 0, broadcast_count = 0, updated_at = ?
+	`, now)
+	if err != nil {
+		return 0, err
+	}
+	affected, _ := res.RowsAffected()
+
+	if period != "" {
+		_, _ = r.db.ExecContext(ctx, `
+			INSERT INTO quota_resets (period, reset_at, affected_users)
+			VALUES (?, ?, ?)
+			ON CONFLICT(period) DO UPDATE SET reset_at = excluded.reset_at, affected_users = excluded.affected_users
+		`, period, now, affected)
+	}
+	return affected, nil
+}
+
+func (r *SQLiteRepository) IsPeriodQuotaReset(ctx context.Context, period string) (bool, error) {
+	if period == "" {
+		return false, nil
+	}
+	var count int
+	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM quota_resets WHERE period = ?`, period).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (r *SQLiteRepository) ManualResetAllQuotas(ctx context.Context) (int64, error) {
+	return r.ResetMonthlyQuotas(ctx, "")
+}
+
+func (r *SQLiteRepository) ListUsers() ([]*domainAuth.User, error) {
+	rows, err := r.db.Query(`
+		SELECT id, email, full_name, password_hash, role, tier_id, tier_name, tier_expires_at, message_count, broadcast_count, created_at, updated_at
+		FROM app_users
+		ORDER BY created_at DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []*domainAuth.User
+	for rows.Next() {
+		var u domainAuth.User
+		var roleStr, tierIDStr string
+		var expiresAt sql.NullTime
+		if err := rows.Scan(&u.ID, &u.Email, &u.FullName, &u.PasswordHash, &roleStr, &tierIDStr, &u.TierName, &expiresAt, &u.MessageCount, &u.BroadcastCount, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			return nil, err
+		}
+		u.Role = domainAuth.Role(roleStr)
+		u.TierID = domainAuth.PlanID(tierIDStr)
+		if expiresAt.Valid {
+			u.TierExpiresAt = &expiresAt.Time
+		}
+		list = append(list, &u)
+	}
+	return list, rows.Err()
+}
+
+func (r *SQLiteRepository) DeleteUser(userID int64) error {
+	if userID <= 0 {
+		return fmt.Errorf("invalid user id")
+	}
+	_, _ = r.db.Exec("DELETE FROM api_keys WHERE user_id = ?", userID)
+	_, _ = r.db.Exec("DELETE FROM user_webhooks WHERE user_id = ?", userID)
+	_, _ = r.db.Exec("UPDATE devices SET user_id = 0 WHERE user_id = ?", userID)
+	_, err := r.db.Exec("DELETE FROM app_users WHERE id = ?", userID)
+	return err
+}
+
+func (r *SQLiteRepository) CountDevicesByUserID(userID int64) (int, error) {
+	if userID <= 0 {
+		return 0, nil
+	}
+	var count int
+	err := r.db.QueryRow("SELECT COUNT(*) FROM devices WHERE user_id = ?", userID).Scan(&count)
+	return count, err
+}
+
+func (r *SQLiteRepository) ListDeviceRecordsByUserID(userID int64) ([]*domainChatStorage.DeviceRecord, error) {
+	rows, err := r.db.Query(`
+		SELECT device_id, display_name, jid, COALESCE(ad_jid, ''), COALESCE(user_id, 0), created_at, updated_at
+		FROM devices
+		WHERE user_id = ?
+		ORDER BY created_at ASC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var records []*domainChatStorage.DeviceRecord
+	for rows.Next() {
+		var rec domainChatStorage.DeviceRecord
+		if err := rows.Scan(&rec.DeviceID, &rec.DisplayName, &rec.JID, &rec.ADJID, &rec.UserID, &rec.CreatedAt, &rec.UpdatedAt); err != nil {
+			return nil, err
+		}
+		records = append(records, &rec)
+	}
+	return records, rows.Err()
+}
+
+func (r *SQLiteRepository) CreateApiKey(apiKey *domainAuth.ApiKey) error {
+	if apiKey == nil || apiKey.UserID <= 0 || apiKey.KeyValue == "" {
+		return fmt.Errorf("valid api key is required")
+	}
+	if apiKey.CreatedAt.IsZero() {
+		apiKey.CreatedAt = time.Now()
+	}
+	res, err := r.db.Exec(`
+		INSERT INTO api_keys (user_id, key_value, name, created_at)
+		VALUES (?, ?, ?, ?)
+	`, apiKey.UserID, apiKey.KeyValue, apiKey.Name, apiKey.CreatedAt)
+	if err != nil {
+		return err
+	}
+	id, err := res.LastInsertId()
+	if err == nil {
+		apiKey.ID = id
+	}
+	return nil
+}
+
+func (r *SQLiteRepository) GetApiKeysByUserID(userID int64) ([]*domainAuth.ApiKey, error) {
+	rows, err := r.db.Query(`
+		SELECT id, user_id, key_value, name, created_at
+		FROM api_keys
+		WHERE user_id = ?
+		ORDER BY created_at DESC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []*domainAuth.ApiKey
+	for rows.Next() {
+		var k domainAuth.ApiKey
+		if err := rows.Scan(&k.ID, &k.UserID, &k.KeyValue, &k.Name, &k.CreatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, &k)
+	}
+	return list, rows.Err()
+}
+
+func (r *SQLiteRepository) GetApiKeyByValue(keyValue string) (*domainAuth.ApiKey, error) {
+	keyValue = strings.TrimSpace(keyValue)
+	if keyValue == "" {
+		return nil, fmt.Errorf("api key value is required")
+	}
+
+	row := r.db.QueryRow(`
+		SELECT id, user_id, key_value, name, created_at
+		FROM api_keys
+		WHERE key_value = ?
+		LIMIT 1
+	`, keyValue)
+
+	var k domainAuth.ApiKey
+	if err := row.Scan(&k.ID, &k.UserID, &k.KeyValue, &k.Name, &k.CreatedAt); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &k, nil
+}
+
+func (r *SQLiteRepository) DeleteApiKey(id, userID int64) error {
+	_, err := r.db.Exec("DELETE FROM api_keys WHERE id = ? AND user_id = ?", id, userID)
+	return err
+}
+
+func (r *SQLiteRepository) CreateUserWebhook(webhook *domainAuth.UserWebhook) error {
+	if webhook == nil || webhook.UserID <= 0 || webhook.URL == "" {
+		return fmt.Errorf("valid webhook is required")
+	}
+	if webhook.CreatedAt.IsZero() {
+		webhook.CreatedAt = time.Now()
+	}
+	res, err := r.db.Exec(`
+		INSERT INTO user_webhooks (user_id, url, secret, events, created_at)
+		VALUES (?, ?, ?, ?, ?)
+	`, webhook.UserID, webhook.URL, webhook.Secret, webhook.Events, webhook.CreatedAt)
+	if err != nil {
+		return err
+	}
+	id, err := res.LastInsertId()
+	if err == nil {
+		webhook.ID = id
+	}
+	return nil
+}
+
+func (r *SQLiteRepository) GetUserWebhooksByUserID(userID int64) ([]*domainAuth.UserWebhook, error) {
+	rows, err := r.db.Query(`
+		SELECT id, user_id, url, secret, events, created_at
+		FROM user_webhooks
+		WHERE user_id = ?
+		ORDER BY created_at DESC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []*domainAuth.UserWebhook
+	for rows.Next() {
+		var w domainAuth.UserWebhook
+		if err := rows.Scan(&w.ID, &w.UserID, &w.URL, &w.Secret, &w.Events, &w.CreatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, &w)
+	}
+	return list, rows.Err()
+}
+
+func (r *SQLiteRepository) DeleteUserWebhook(id, userID int64) error {
+	_, err := r.db.Exec("DELETE FROM user_webhooks WHERE id = ? AND user_id = ?", id, userID)
+	return err
+}
+
+// _____________________________________________________________________________________________________________________
+// Plan Management Methods
+
+func (r *SQLiteRepository) seedDefaultPlans() error {
+	var count int
+	err := r.db.QueryRow("SELECT COUNT(*) FROM plans").Scan(&count)
+	if err != nil || count == 0 {
+		for _, p := range domainAuth.AvailablePlans {
+			_ = r.CreatePlan(&p)
+		}
+	} else {
+		for _, p := range domainAuth.AvailablePlans {
+			existing, _ := r.GetPlanByID(p.ID)
+			if existing == nil {
+				_ = r.CreatePlan(&p)
+			}
+		}
+	}
+
+	// Always sync default tier quotas for Trial, Ocean and Sea
+	_, _ = r.db.Exec("UPDATE plans SET name = 'Trial', device_limit = 1, message_limit = 100, broadcast_limit = 3, api_key_limit = 1, webhook_limit = 1, duration_days = 7, price_monthly = 0, description = 'No description set for this tier.' WHERE LOWER(id) = 'trial'")
+	_, _ = r.db.Exec("UPDATE plans SET name = 'Ocean', device_limit = 2, message_limit = 100, broadcast_limit = 5000, api_key_limit = 1, webhook_limit = 1, duration_days = 30, price_monthly = 35000, description = 'Ideal for individuals starting WhatsApp automation (100 messages sending limit & 5,000 broadcasts).' WHERE LOWER(id) = 'ocean'")
+	_, _ = r.db.Exec("UPDATE plans SET name = 'Sea', device_limit = 10, message_limit = -1, broadcast_limit = -1, api_key_limit = 2, webhook_limit = 4, duration_days = 30, price_monthly = 75000, description = 'Designed for growing businesses with unlimited sending messages, unlimited broadcasts & multi-device power.' WHERE LOWER(id) = 'sea'")
+	logrus.Infof("[SAAS_INIT] Seeded/synchronized default subscription plans: Trial, Ocean (35k/mo) & Sea (75k/mo, 10 devices, Unlimited)")
+	return nil
+}
+
+func (r *SQLiteRepository) GetAllPlans() ([]domainAuth.Plan, error) {
+	rows, err := r.db.Query(`
+		SELECT id, name, device_limit, message_limit, broadcast_limit, api_key_limit, webhook_limit, duration_days, price_monthly, description, is_active, created_at, updated_at
+		FROM plans
+		ORDER BY price_monthly ASC, id ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var plans []domainAuth.Plan
+	for rows.Next() {
+		var p domainAuth.Plan
+		var idStr string
+		var isActiveInt int
+		if err := rows.Scan(&idStr, &p.Name, &p.DeviceLimit, &p.MessageLimit, &p.BroadcastLimit, &p.ApiKeyLimit, &p.WebhookLimit, &p.DurationDays, &p.PriceMonthly, &p.Description, &isActiveInt, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, err
+		}
+		p.ID = domainAuth.PlanID(idStr)
+		p.IsActive = isActiveInt == 1
+		plans = append(plans, p)
+	}
+	return plans, rows.Err()
+}
+
+func (r *SQLiteRepository) GetPlanByID(id domainAuth.PlanID) (*domainAuth.Plan, error) {
+	if id == "" {
+		return nil, fmt.Errorf("plan id is required")
+	}
+
+	row := r.db.QueryRow(`
+		SELECT id, name, device_limit, message_limit, broadcast_limit, api_key_limit, webhook_limit, duration_days, price_monthly, description, is_active, created_at, updated_at
+		FROM plans
+		WHERE LOWER(id) = ?
+		LIMIT 1
+	`, strings.ToLower(string(id)))
+
+	var p domainAuth.Plan
+	var idStr string
+	var isActiveInt int
+	if err := row.Scan(&idStr, &p.Name, &p.DeviceLimit, &p.MessageLimit, &p.BroadcastLimit, &p.ApiKeyLimit, &p.WebhookLimit, &p.DurationDays, &p.PriceMonthly, &p.Description, &isActiveInt, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err == sql.ErrNoRows {
+			// Fallback to in-memory defaults if not yet seeded
+			if defPlan, ok := domainAuth.AvailablePlans[id]; ok {
+				return &defPlan, nil
+			}
+			return nil, nil
+		}
+		return nil, err
+	}
+	p.ID = domainAuth.PlanID(idStr)
+	p.IsActive = isActiveInt == 1
+	return &p, nil
+}
+
+func (r *SQLiteRepository) CreatePlan(p *domainAuth.Plan) error {
+	if p == nil || p.ID == "" || p.Name == "" {
+		return fmt.Errorf("valid plan is required")
+	}
+	now := time.Now()
+	if p.CreatedAt.IsZero() {
+		p.CreatedAt = now
+	}
+	p.UpdatedAt = now
+	if p.DurationDays <= 0 {
+		p.DurationDays = 30
+	}
+	if p.DeviceLimit <= 0 {
+		p.DeviceLimit = 1
+	}
+
+	isActiveInt := 1
+	if !p.IsActive && !p.CreatedAt.IsZero() && p.CreatedAt != now {
+		isActiveInt = 0
+	}
+
+	_, err := r.db.Exec(`
+		INSERT INTO plans (id, name, device_limit, message_limit, broadcast_limit, api_key_limit, webhook_limit, duration_days, price_monthly, description, is_active, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			name = excluded.name,
+			device_limit = excluded.device_limit,
+			message_limit = excluded.message_limit,
+			broadcast_limit = excluded.broadcast_limit,
+			api_key_limit = excluded.api_key_limit,
+			webhook_limit = excluded.webhook_limit,
+			duration_days = excluded.duration_days,
+			price_monthly = excluded.price_monthly,
+			description = excluded.description,
+			is_active = excluded.is_active,
+			updated_at = excluded.updated_at
+	`, strings.ToLower(string(p.ID)), p.Name, p.DeviceLimit, p.MessageLimit, p.BroadcastLimit, p.ApiKeyLimit, p.WebhookLimit, p.DurationDays, p.PriceMonthly, p.Description, isActiveInt, p.CreatedAt, p.UpdatedAt)
+	return err
+}
+
+func (r *SQLiteRepository) UpdatePlan(p *domainAuth.Plan) error {
+	if p == nil || p.ID == "" {
+		return fmt.Errorf("plan id is required")
+	}
+	p.UpdatedAt = time.Now()
+	isActiveInt := 0
+	if p.IsActive {
+		isActiveInt = 1
+	}
+
+	_, err := r.db.Exec(`
+		UPDATE plans
+		SET name = ?, device_limit = ?, message_limit = ?, broadcast_limit = ?, api_key_limit = ?, webhook_limit = ?, duration_days = ?, price_monthly = ?, description = ?, is_active = ?, updated_at = ?
+		WHERE LOWER(id) = ?
+	`, p.Name, p.DeviceLimit, p.MessageLimit, p.BroadcastLimit, p.ApiKeyLimit, p.WebhookLimit, p.DurationDays, p.PriceMonthly, p.Description, isActiveInt, p.UpdatedAt, strings.ToLower(string(p.ID)))
+	return err
+}
+
+func (r *SQLiteRepository) DeletePlan(id domainAuth.PlanID) error {
+	_, err := r.db.Exec("DELETE FROM plans WHERE LOWER(id) = ?", strings.ToLower(string(id)))
+	return err
+}
+
+// _____________________________________________________________________________________________________________________
+// Auto Responses CRUD Implementation
+
+func (r *SQLiteRepository) GetActiveAutoResponses(ctx context.Context, deviceID string) ([]domainAuth.AutoResponse, error) {
+	query := `
+		SELECT id, user_id, device_id, trigger_type, trigger_keyword, response_message, is_active, created_at, updated_at
+		FROM auto_responses
+		WHERE is_active = 1
+		ORDER BY id ASC
+	`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []domainAuth.AutoResponse
+	cleanDeviceID := strings.ToLower(strings.TrimSpace(deviceID))
+
+	for rows.Next() {
+		var ar domainAuth.AutoResponse
+		var trigType string
+		var isActiveInt int
+		if err := rows.Scan(&ar.ID, &ar.UserID, &ar.DeviceID, &trigType, &ar.TriggerKeyword, &ar.ResponseMessage, &isActiveInt, &ar.CreatedAt, &ar.UpdatedAt); err != nil {
+			return nil, err
+		}
+		ar.TriggerType = domainAuth.AutoResponseTriggerType(trigType)
+		ar.IsActive = (isActiveInt == 1)
+
+		ruleDev := strings.ToLower(strings.TrimSpace(ar.DeviceID))
+		// If rule applies to all devices (empty) or matches the requested device
+		if ruleDev == "" || cleanDeviceID == "" || ruleDev == cleanDeviceID || strings.Contains(cleanDeviceID, ruleDev) || strings.Contains(ruleDev, cleanDeviceID) {
+			results = append(results, ar)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+func (r *SQLiteRepository) GetUserAutoResponses(ctx context.Context, userID int64) ([]domainAuth.AutoResponse, error) {
+	query := `
+		SELECT id, user_id, device_id, trigger_type, trigger_keyword, response_message, is_active, created_at, updated_at
+		FROM auto_responses
+		WHERE user_id = ?
+		ORDER BY id DESC
+	`
+	rows, err := r.db.QueryContext(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []domainAuth.AutoResponse
+	for rows.Next() {
+		var ar domainAuth.AutoResponse
+		var trigType string
+		var isActiveInt int
+		if err := rows.Scan(&ar.ID, &ar.UserID, &ar.DeviceID, &trigType, &ar.TriggerKeyword, &ar.ResponseMessage, &isActiveInt, &ar.CreatedAt, &ar.UpdatedAt); err != nil {
+			return nil, err
+		}
+		ar.TriggerType = domainAuth.AutoResponseTriggerType(trigType)
+		ar.IsActive = (isActiveInt == 1)
+		results = append(results, ar)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+func (r *SQLiteRepository) CreateAutoResponse(ctx context.Context, ar *domainAuth.AutoResponse) error {
+	if ar == nil {
+		return fmt.Errorf("auto response is required")
+	}
+	now := time.Now()
+	if ar.CreatedAt.IsZero() {
+		ar.CreatedAt = now
+	}
+	ar.UpdatedAt = now
+	if ar.TriggerType == "" {
+		ar.TriggerType = domainAuth.TriggerContains
+	}
+
+	isActiveInt := 1
+	if !ar.IsActive {
+		isActiveInt = 0
+	}
+
+	res, err := r.db.ExecContext(ctx, `
+		INSERT INTO auto_responses (user_id, device_id, trigger_type, trigger_keyword, response_message, is_active, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, ar.UserID, ar.DeviceID, string(ar.TriggerType), ar.TriggerKeyword, ar.ResponseMessage, isActiveInt, ar.CreatedAt, ar.UpdatedAt)
+	if err != nil {
+		return err
+	}
+
+	id, err := res.LastInsertId()
+	if err == nil {
+		ar.ID = id
+	}
+	return nil
+}
+
+func (r *SQLiteRepository) UpdateAutoResponse(ctx context.Context, ar *domainAuth.AutoResponse) error {
+	if ar == nil || ar.ID <= 0 {
+		return fmt.Errorf("auto response id is required")
+	}
+	ar.UpdatedAt = time.Now()
+	isActiveInt := 0
+	if ar.IsActive {
+		isActiveInt = 1
+	}
+
+	_, err := r.db.ExecContext(ctx, `
+		UPDATE auto_responses
+		SET device_id = ?, trigger_type = ?, trigger_keyword = ?, response_message = ?, is_active = ?, updated_at = ?
+		WHERE id = ? AND user_id = ?
+	`, ar.DeviceID, string(ar.TriggerType), ar.TriggerKeyword, ar.ResponseMessage, isActiveInt, ar.UpdatedAt, ar.ID, ar.UserID)
+	return err
+}
+
+func (r *SQLiteRepository) DeleteAutoResponse(ctx context.Context, id int64, userID int64) error {
+	_, err := r.db.ExecContext(ctx, "DELETE FROM auto_responses WHERE id = ? AND user_id = ?", id, userID)
+	return err
+}
+
+

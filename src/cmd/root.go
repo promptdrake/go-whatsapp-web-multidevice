@@ -12,6 +12,7 @@ import (
 
 	"github.com/aldinokemal/go-whatsapp-web-multidevice/config"
 	domainApp "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/app"
+	domainAuth "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/auth"
 	domainCall "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/call"
 	domainChat "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/chat"
 	domainChatStorage "github.com/aldinokemal/go-whatsapp-web-multidevice/domains/chatstorage"
@@ -51,6 +52,7 @@ var (
 	groupUsecase      domainGroup.IGroupUsecase
 	newsletterUsecase domainNewsletter.INewsletterUsecase
 	deviceUsecase     domainDevice.IDeviceUsecase
+	authUsecase       domainAuth.IAuthUsecase
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -104,6 +106,14 @@ func initEnvConfig() {
 	}
 	if envCORSOrigins := viper.GetString("app_cors_allowed_origins"); envCORSOrigins != "" {
 		config.AppCORSAllowedOrigins = strings.Split(envCORSOrigins, ",")
+	}
+
+	// SaaS Admin credentials
+	if envEmail := viper.GetString("gowa_email"); envEmail != "" {
+		config.GowaEmail = envEmail
+	}
+	if envPassword := viper.GetString("gowa_password"); envPassword != "" {
+		config.GowaPassword = envPassword
 	}
 
 	// Web UI settings. Guarded on GetString != "" so an unset key keeps the
@@ -348,6 +358,19 @@ func initFlags() {
 		config.AppCORSAllowedOrigins,
 		`allowed CORS origins, any origin when empty --cors-allowed-origins <string> | example: --cors-allowed-origins="https://ui.example.com,https://ops.example.com"`,
 	)
+	rootCmd.PersistentFlags().StringVarP(
+		&config.GowaEmail,
+		"gowa-email", "",
+		config.GowaEmail,
+		`admin email for SaaS dashboard --gowa-email <string> | example: --gowa-email="admin@example.com"`,
+	)
+	rootCmd.PersistentFlags().StringVarP(
+		&config.GowaPassword,
+		"gowa-password", "",
+		config.GowaPassword,
+		`admin password for SaaS dashboard --gowa-password <string> | example: --gowa-password="admin"`,
+	)
+
 
 	// Web UI flags
 	rootCmd.PersistentFlags().BoolVarP(
@@ -629,7 +652,14 @@ func initFlags() {
 }
 
 func initChatStorage() (*sql.DB, error) {
-	connStr := sqlite.FormatChatStorageURI(config.ChatStorageURI, config.ChatStorageEnableWAL, config.ChatStorageEnableForeignKeys)
+	chatStorageURI := strings.TrimSpace(strings.Trim(config.ChatStorageURI, `"'`))
+	if chatStorageURI == "" {
+		chatStorageURI = "file:storages/chatstorage.db"
+	}
+	if !strings.HasPrefix(chatStorageURI, "file:") {
+		chatStorageURI = "file:" + chatStorageURI
+	}
+	connStr := sqlite.FormatChatStorageURI(chatStorageURI, config.ChatStorageEnableWAL, config.ChatStorageEnableForeignKeys)
 
 	db, err := sql.Open(sqlite.DriverName, connStr)
 	if err != nil {
@@ -700,6 +730,7 @@ func initApp() {
 	groupUsecase = usecase.NewGroupService()
 	newsletterUsecase = usecase.NewNewsletterService()
 	deviceUsecase = usecase.NewDeviceService(dm, appUsecase)
+	authUsecase = usecase.NewAuthService(chatStorageRepo)
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
